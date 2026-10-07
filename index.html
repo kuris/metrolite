@@ -798,6 +798,329 @@ function stageUsesDiagonal(def) {
   return def.edges.some(([r1, c1, r2, c2]) => Math.abs(r2 - r1) === 1 && Math.abs(c2 - c1) === 1);
 }
 
+// ------------------- 절차적 스테이지 생성기 (7번 노선 이후 무한 모드) -------------------
+// 수작업 7개 노선을 다 깨면, 그 뒤로는 이 생성기가 매번 새 노선을 즉석에서 만들어 이어준다.
+// 생성기는 STAGES의 각 항목과 똑같은 { name, rows, cols, power, stations, edges } 모양만 만들어내므로,
+// constructState/buildStageState/computeEnergized 등 기존 로직은 전혀 손대지 않고 그대로 재사용된다.
+
+function randInt(min, max) { return min + Math.floor(Math.random() * (max - min + 1)); }
+function choice(arr) { return arr[randInt(0, arr.length - 1)]; }
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randInt(0, i);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const CARDINAL_DIRS = ['N', 'E', 'S', 'W'];
+// allowDiagonal=false(4방향 모드)면 대각선을 애초에 후보에서 빼서, 생성 단계에서부터
+// 90도 회전만으로 못 맞추는 타일이 나올 수 없게 만든다.
+function allowedDirs(allowDiagonal) { return allowDiagonal ? DIRS.slice() : CARDINAL_DIRS.slice(); }
+
+// 한 칸 이동을 시도: 보드 범위 밖이거나 이미 다른 가지가 지나간 칸이면 null.
+// 모든 생성기가 이 함수로만 다음 칸을 계산해서, 경계 체크와 "가지끼리 겹치지 않기(사이클 방지)"를
+// 한 곳에서 보장한다 (computeEnergized/buildEulerTour가 트리 구조를 가정하기 때문에 중요함).
+function tryStep(r, c, dir, rows, cols, occupied) {
+  const [dr, dc] = DELTA[dir];
+  const nr = r + dr, nc = c + dc;
+  if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return null;
+  if (occupied.has(keyOf(nr, nc))) return null;
+  return [nr, nc];
+}
+
+// 화면 기준 각도(0=E, 시계방향으로 증가)를 가장 가까운 허용 방향으로 변환
+const DIR_ANGLE = { E: 0, SE: 45, S: 90, SW: 135, W: 180, NW: 225, N: 270, NE: 315 };
+function snapAngleToDir(angleDeg, allowDiagonal) {
+  const norm = ((angleDeg % 360) + 360) % 360;
+  const dirs = allowedDirs(allowDiagonal);
+  let best = dirs[0], bestDiff = Infinity;
+  dirs.forEach(d => {
+    const diff = Math.min(Math.abs(norm - DIR_ANGLE[d]), 360 - Math.abs(norm - DIR_ANGLE[d]));
+    if (diff < bestDiff) { bestDiff = diff; best = d; }
+  });
+  return best;
+}
+
+// 허용된 방향 원형(allowedDirs)에서 한 방향을 steps칸 돌린 방향을 반환 (양수=시계방향)
+function rotateDirBy(dir, steps, allowDiagonal) {
+  const dirs = allowedDirs(allowDiagonal);
+  const idx = dirs.indexOf(dir);
+  return dirs[(idx + steps + dirs.length) % dirs.length];
+}
+
+// ---- 패턴 1: 방사형 꽃 (기존 수작업 노선의 "전원역 중심으로 팔이 뻗는" 느낌을 일반화) ----
+function generateRadialFlower(rows, cols, allowDiagonal) {
+  const power = [Math.floor(rows / 2), Math.floor(cols / 2)];
+  const occupied = new Set([keyOf(power[0], power[1])]);
+  const edges = [];
+  const stations = [];
+  const armCount = choice([3, 3, 4, 4, 4, 5, 5]);
+  const bendProb = allowDiagonal ? 0.5 : 0.35;
+
+  for (let i = 0; i < armCount; i++) {
+    const angle = i * (360 / armCount) + randInt(-15, 15);
+    let dir = snapAngleToDir(angle, allowDiagonal);
+    const armLen = randInt(2, Math.max(2, Math.min(rows, cols) - 2));
+    let [r, c] = power;
+    let bent = false;
+    let moved = false;
+    for (let step = 0; step < armLen; step++) {
+      let next = tryStep(r, c, dir, rows, cols, occupied);
+      if (!next && !bent) {
+        // 막히면 한 번은 꺾어서라도 이어가 본다
+        for (const s of (allowDiagonal ? [1, -1, 2, -2] : [1, -1])) {
+          const altDir = rotateDirBy(dir, s, allowDiagonal);
+          const altNext = tryStep(r, c, altDir, rows, cols, occupied);
+          if (altNext) { next = altNext; dir = altDir; bent = true; break; }
+        }
+      } else if (next && !bent && step > 0 && Math.random() < bendProb) {
+        // 정상적으로 갈 수 있어도 확률적으로 한 번 꺾는다 (직선+대각선이 섞인 혼합 꺾임 타일을 만들기 위해)
+        const altDir = rotateDirBy(dir, choice([1, -1]), allowDiagonal);
+        const altNext = tryStep(r, c, altDir, rows, cols, occupied);
+        if (altNext) { next = altNext; dir = altDir; bent = true; }
+      }
+      if (!next) break;
+      edges.push([r, c, next[0], next[1]]);
+      occupied.add(keyOf(next[0], next[1]));
+      r = next[0]; c = next[1];
+      moved = true;
+    }
+    if (moved) stations.push([r, c]);
+  }
+  return { power, stations, edges };
+}
+
+// ---- 패턴 2: 프랙탈 분기 (몸통 2~3개가 중간에서 두 가지로 갈라지는 "나무/코랄" 느낌) ----
+function generateFractalBranch(rows, cols, allowDiagonal) {
+  const power = [Math.floor(rows / 2), Math.floor(cols / 2)];
+  const occupied = new Set([keyOf(power[0], power[1])]);
+  const edges = [];
+  const stations = [];
+  const trunkCount = randInt(2, 3);
+
+  for (let i = 0; i < trunkCount; i++) {
+    const angle = i * (360 / trunkCount) + randInt(-20, 20);
+    const trunkDir = snapAngleToDir(angle, allowDiagonal);
+    const trunkLen = randInt(2, 3);
+    let [r, c] = power;
+    const path = [[r, c]];
+    for (let step = 0; step < trunkLen; step++) {
+      const next = tryStep(r, c, trunkDir, rows, cols, occupied);
+      if (!next) break;
+      edges.push([r, c, next[0], next[1]]);
+      occupied.add(keyOf(next[0], next[1]));
+      r = next[0]; c = next[1];
+      path.push([r, c]);
+    }
+    if (path.length < 2) continue; // 몸통이 한 칸도 못 뻗었으면 이 가지는 포기
+
+    const doSplit = Math.random() < 0.85;
+    if (!doSplit) { stations.push(path[path.length - 1]); continue; }
+
+    const splitIdx = randInt(1, path.length - 1);
+    const [sr, sc] = path[splitIdx];
+    let anyTwig = false;
+    [1, -1].forEach(s => {
+      const twigDir = rotateDirBy(trunkDir, s, allowDiagonal);
+      let [tr, tc] = [sr, sc];
+      const twigLen = randInt(1, 2);
+      let moved = false;
+      for (let step = 0; step < twigLen; step++) {
+        const next = tryStep(tr, tc, twigDir, rows, cols, occupied);
+        if (!next) break;
+        edges.push([tr, tc, next[0], next[1]]);
+        occupied.add(keyOf(next[0], next[1]));
+        tr = next[0]; tc = next[1];
+        moved = true;
+      }
+      if (moved) { stations.push([tr, tc]); anyTwig = true; }
+    });
+    if (!anyTwig) stations.push(path[path.length - 1]);
+  }
+  return { power, stations, edges };
+}
+
+// ---- 패턴 3: 나선형 (전원역에서 바깥으로 소용돌이치듯 뻗어나가는 단일 경로) ----
+function generateSpiral(rows, cols, allowDiagonal) {
+  const power = [Math.floor(rows / 2), Math.floor(cols / 2)];
+  const occupied = new Set([keyOf(power[0], power[1])]);
+  const edges = [];
+  const path = [power];
+  const ring = allowedDirs(allowDiagonal);
+  let dirIndex = randInt(0, ring.length - 1);
+  let legLength = 1, stepsOnLeg = 0, legsCompleted = 0;
+  const maxTotalSteps = randInt(8, 14);
+  let [r, c] = power;
+
+  for (let total = 0; total < maxTotalSteps; total++) {
+    const dir = ring[dirIndex];
+    const next = tryStep(r, c, dir, rows, cols, occupied);
+    if (!next) break;
+    edges.push([r, c, next[0], next[1]]);
+    occupied.add(keyOf(next[0], next[1]));
+    r = next[0]; c = next[1];
+    path.push([r, c]);
+    stepsOnLeg++;
+    if (stepsOnLeg >= legLength) {
+      // ring이 4방향(90도/칸)이면 1칸=90도 회전, 8방향(45도/칸)이면 2칸=90도 회전이 "표준 직각 회전".
+      // 대각선 허용 모드에서는 가끔(30%) 1칸(45도)만 돌아서, 나선이 더 부드럽게 휘도록 함
+      const quarterTurn = allowDiagonal ? 2 : 1;
+      const turnSteps = (allowDiagonal && Math.random() < 0.3) ? 1 : quarterTurn;
+      dirIndex = (dirIndex + turnSteps) % ring.length;
+      stepsOnLeg = 0;
+      legsCompleted++;
+      if (legsCompleted % 2 === 0) legLength++; // 표준 사각 나선처럼 2바퀴마다 다리 길이를 늘림
+    }
+  }
+
+  if (path.length < 4) return { power, stations: [], edges: [] }; // 너무 일찍 멈추면 실패 처리(디스패처가 재시도)
+
+  const stations = [];
+  const stationInterval = randInt(2, 3);
+  for (let i = stationInterval; i < path.length; i += stationInterval) stations.push(path[i]);
+  const lastCell = path[path.length - 1];
+  if (!stations.some(s => s[0] === lastCell[0] && s[1] === lastCell[1])) stations.push(lastCell);
+  if (stations.length < 2) stations.push(path[Math.floor(path.length / 2)]);
+
+  return { power, stations, edges };
+}
+
+// ---- 패턴 4: 지그재그 격자 (일부러 비대칭으로 왔다갔다 채우는, 다른 3개와 대조되는 미로 느낌) ----
+function generateLatticeZigzag(rows, cols, allowDiagonal) {
+  const startRow = randInt(0, rows - 1);
+  const power = [startRow, 0];
+  const occupied = new Set([keyOf(power[0], power[1])]);
+  const edges = [];
+  const turningPoints = [];
+  let [r, c] = power;
+  let horizDir = 'E';
+  let vertDir = startRow < rows - 1 ? 'S' : 'N';
+  const maxSteps = randInt(10, 16);
+  let stepsTaken = 0;
+
+  while (stepsTaken < maxSteps) {
+    const runLen = randInt(2, Math.max(2, cols - 2));
+    let movedInLeg = false;
+    for (let i = 0; i < runLen && stepsTaken < maxSteps; i++) {
+      const next = tryStep(r, c, horizDir, rows, cols, occupied);
+      if (!next) break;
+      edges.push([r, c, next[0], next[1]]);
+      occupied.add(keyOf(next[0], next[1]));
+      r = next[0]; c = next[1];
+      stepsTaken++;
+      movedInLeg = true;
+    }
+    if (!movedInLeg) break;
+    turningPoints.push([r, c]);
+
+    // 연결 스텝: 보통 세로로 한 칸, 대각선 허용 모드에선 25% 확률로 대각선 한 칸("모서리를 깎은" 느낌)
+    const diagonalConnector = allowDiagonal && Math.random() < 0.25;
+    function connectorFor(vDir) {
+      if (!diagonalConnector) return vDir;
+      return horizDir === 'E' ? (vDir === 'S' ? 'SE' : 'NE') : (vDir === 'S' ? 'SW' : 'NW');
+    }
+    let next = tryStep(r, c, connectorFor(vertDir), rows, cols, occupied);
+    if (!next) {
+      vertDir = vertDir === 'S' ? 'N' : 'S'; // 더 못 내려가면(또는 못 올라가면) 반대로 뒤집어 재시도
+      next = tryStep(r, c, connectorFor(vertDir), rows, cols, occupied);
+    }
+    if (!next) break;
+    edges.push([r, c, next[0], next[1]]);
+    occupied.add(keyOf(next[0], next[1]));
+    r = next[0]; c = next[1];
+    stepsTaken++;
+    horizDir = horizDir === 'E' ? 'W' : 'E';
+  }
+
+  let stations = turningPoints;
+  if (stations.length > 6) stations = stations.filter((_, i) => i % 2 === 0);
+  const lastCell = [r, c];
+  if (!stations.some(s => s[0] === lastCell[0] && s[1] === lastCell[1])) stations.push(lastCell);
+  if (stations.length < 2 && turningPoints.length >= 2) stations = turningPoints.slice(0, 2);
+
+  return { power, stations, edges };
+}
+
+// 생성된 노선 하나가 실제로 플레이 가능한 모양인지 검증:
+// 역이 2개 이상, 좌표 중복/범위 밖 없음, (4방향 모드면) 대각선 전혀 없음, 사이클 없는 트리,
+// 전원역에서 모든 역까지 연결됨.
+function isValidStageDef(raw, rows, cols, allowDiagonal) {
+  if (!raw || !raw.power || !Array.isArray(raw.stations) || !Array.isArray(raw.edges)) return false;
+  if (raw.stations.length < 2) return false;
+  const inBounds = ([r, c]) => r >= 0 && r < rows && c >= 0 && c < cols;
+  if (!inBounds(raw.power)) return false;
+  if (!raw.stations.every(inBounds)) return false;
+  if (raw.edges.length === 0) return false;
+  if (allowDiagonal === false && stageUsesDiagonal(raw)) return false;
+
+  const powerKey = keyOf(raw.power[0], raw.power[1]);
+  const stationKeys = raw.stations.map(([r, c]) => keyOf(r, c));
+  if (new Set(stationKeys).size !== stationKeys.length) return false; // 역 좌표 중복
+  if (stationKeys.includes(powerKey)) return false; // 역이 전원역과 겹침
+
+  // 트리 검증: edges가 닿는 칸 수 == edges.length + 1 (사이클/중복 간선이 있으면 이 수가 작아짐)
+  const cellSet = new Set([powerKey]);
+  raw.edges.forEach(([r1, c1, r2, c2]) => { cellSet.add(keyOf(r1, c1)); cellSet.add(keyOf(r2, c2)); });
+  if (cellSet.size !== raw.edges.length + 1) return false;
+
+  // 연결성 검증: 전원역에서 BFS로 모든 역에 닿는지 확인
+  const adj = {};
+  raw.edges.forEach(([r1, c1, r2, c2]) => {
+    const a = keyOf(r1, c1), b = keyOf(r2, c2);
+    (adj[a] = adj[a] || []).push(b);
+    (adj[b] = adj[b] || []).push(a);
+  });
+  const visited = new Set([powerKey]);
+  const queue = [powerKey];
+  while (queue.length) {
+    const cur = queue.shift();
+    (adj[cur] || []).forEach(next => { if (!visited.has(next)) { visited.add(next); queue.push(next); } });
+  }
+  return stationKeys.every(k => visited.has(k));
+}
+
+const STAGE_FAMILIES = [generateRadialFlower, generateFractalBranch, generateSpiral, generateLatticeZigzag];
+let familyBag = [];
+// "가방 뽑기" 방식: 4개를 섞어서 하나씩 다 뽑을 때까지 반복 뽑지 않음 -> 연속 4판 안에는
+// 반드시 4가지 패턴이 한 번씩 다 나오게 되어, 같은 패턴이 계속 반복되는 걸 막는다.
+function pickFamily() {
+  if (familyBag.length === 0) familyBag = shuffle(STAGE_FAMILIES);
+  return familyBag.pop();
+}
+
+// 생성 스테이지는 처음 6개까지는 5x5(수작업 노선과 같은 크기), 그 이후부터는 6x6으로 커진다.
+function gridSizeForGeneratedIndex(genIndex) { return genIndex < 6 ? 5 : 6; }
+
+const GEN_PLACE_FRAGMENTS = ['한빛', '은파', '청솔', '별내', '소슬', '단풍', '늘봄', '구름', '노리', '미로'];
+const GEN_LINE_SUFFIXES = ['순환선', '지선', '연결선', '회랑선', '보선', '외곽선', '심야선', '임시선'];
+let recentGenNames = [];
+// 수작업 7개 노선 이름과 겹치지 않고, 바로 직전 3개와도 겹치지 않는 이름을 무작위로 조합
+function generateStageName() {
+  let name;
+  do { name = `${choice(GEN_PLACE_FRAGMENTS)} ${choice(GEN_LINE_SUFFIXES)}`; }
+  while (recentGenNames.includes(name));
+  recentGenNames.push(name);
+  if (recentGenNames.length > 3) recentGenNames.shift();
+  return name;
+}
+
+// 7번 노선 이후 "무한 모드"에서 "다음 노선" 버튼을 누를 때마다 호출되어 노선 하나를 즉석에서 만들어낸다.
+function generateStage(genIndex, allowDiagonal) {
+  const size = gridSizeForGeneratedIndex(genIndex);
+  const family = pickFamily();
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const raw = family(size, size, allowDiagonal);
+    if (isValidStageDef(raw, size, size, allowDiagonal)) {
+      return { name: generateStageName(), rows: size, cols: size, power: raw.power, stations: raw.stations, edges: raw.edges };
+    }
+  }
+  // 10번 시도해도 유효한 노선이 안 나오면(매우 드묾), 가장 안정적인 방사형 꽃으로 대체
+  const fallback = generateRadialFlower(size, size, allowDiagonal);
+  return { name: generateStageName(), rows: size, cols: size, power: fallback.power, stations: fallback.stations, edges: fallback.edges };
+}
+
 // ------------------- 상태 생성 -------------------
 
 // 타일이 처음부터 "이미 풀린 상태"로 시작하지 않도록 초기 회전값을 정함.
@@ -962,11 +1285,27 @@ const mode8Btn = document.getElementById('mode8Btn');
 
 // rotationStep: 클릭 한 번의 회전 단위(45도 칸 수). 4방향 모드=2(90도), 8방향 모드=1(45도).
 // activeStages: 선택한 모드로 플레이할 노선 목록. 4방향 모드는 대각선을 쓰는 노선을 제외한다.
+// curatedCount: activeStages 안에서 수작업 노선이 몇 개인지(모드별로 필터링된 뒤의 길이).
+// generatedCount: 지금까지 즉석에서 만들어낸 노선 수. milestoneShown: "모든 노선 복구 완료" 배너를 이미 보여줬는지.
 let rotationStep = 1;
 let activeStages = STAGES;
+let curatedCount = STAGES.length;
+let generatedCount = 0;
+let milestoneShown = false;
 let currentStageIndex = 0;
 let currentState = null;
 let trainAnimation = null; // 진행 중인 기차 애니메이션(Web Animations API) 참조
+
+// 현재 모드(rotationStep)에 맞는 수작업 노선 목록으로 activeStages를 되돌리고,
+// 무한 모드 관련 상태(생성 개수, 배너 표시 여부)도 초기화한다.
+function resetActiveStagesToCurated() {
+  // .slice()로 항상 새 배열을 만든다 — 그냥 STAGES를 대입하면 같은 배열을 가리키게 되어,
+  // 무한 모드에서 activeStages.push(...)를 할 때 수작업 STAGES 배열 자체가 오염된다.
+  activeStages = rotationStep === 2 ? STAGES.filter(def => !stageUsesDiagonal(def)) : STAGES.slice();
+  curatedCount = activeStages.length;
+  generatedCount = 0;
+  milestoneShown = false;
+}
 
 // 타일 회전 CSS transition(0.22s)과 동일하게 맞춘 지연 시간.
 // 클릭 즉시가 아니라, 회전이 "딱" 끝나서 선로가 맞물리는 순간에만 통전 판정 + 전기음이 울리게 함.
@@ -1375,7 +1714,10 @@ function updateAfterMove() {
     playTrainAnimation();
     boardEl.querySelectorAll('.tile').forEach(t => t.classList.add('cleared'));
 
-    if (currentStageIndex === activeStages.length - 1) {
+    // 수작업 노선을 처음 다 깨는 순간에만 "모든 노선 복구 완료" 배너를 한 번 보여주고,
+    // 그 뒤로는 무한 모드로 이어지니 nextBtn이 계속 "다음 노선"을 생성해서 보여준다.
+    if (currentStageIndex === curatedCount - 1 && !milestoneShown) {
+      milestoneShown = true;
       nextBtn.classList.add('hidden');
       allClearBanner.classList.remove('hidden');
     } else {
@@ -1458,7 +1800,11 @@ function loadStage(index) {
   const def = activeStages[index];
   currentState = buildStageState(def);
 
-  stageBadgeEl.textContent = `${index + 1}/${activeStages.length}`;
+  // 수작업 노선은 "3/7"처럼 전체 개수를 보여주고, 그 뒤 무한 모드 노선은 끝이 없으니
+  // "N번째 노선 · 무한모드"처럼 번호만 보여준다.
+  stageBadgeEl.textContent = index < curatedCount
+    ? `${index + 1}/${curatedCount}`
+    : `${index + 1}번째 노선 · 무한모드`;
   stageNameEl.textContent = def.name;
   statusEl.textContent = '노선을 복구하세요';
   nextBtn.classList.add('hidden');
@@ -1471,20 +1817,24 @@ function loadStage(index) {
 }
 
 nextBtn.addEventListener('click', () => {
-  if (currentStageIndex + 1 < activeStages.length) {
-    loadStage(currentStageIndex + 1);
+  const nextIndex = currentStageIndex + 1;
+  if (nextIndex >= activeStages.length) {
+    // 수작업 노선이 끝났으면, "다음 노선"을 누르는 순간 새 노선을 즉석에서 만들어 이어붙인다.
+    activeStages.push(generateStage(generatedCount, rotationStep === 2));
+    generatedCount++;
   }
+  loadStage(nextIndex);
 });
 
 restartBtn.addEventListener('click', () => {
+  resetActiveStagesToCurated(); // 무한 모드 중에 재시작해도 생성된 노선이 남아있지 않게 초기화
   loadStage(0);
 });
 
 // ------------------- 모드(난이도) 선택 -> 선택한 모드에 맞춰 노선 목록/회전 단위를 정하고 게임 시작 -------------------
 function startWithMode(step) {
   rotationStep = step;
-  // 4방향 모드(step===2)에서는 대각선을 쓰는 노선을 아예 빼서, 90도 회전만으로 못 푸는 타일이 안 나오게 한다.
-  activeStages = step === 2 ? STAGES.filter(def => !stageUsesDiagonal(def)) : STAGES;
+  resetActiveStagesToCurated();
   modeSelectOverlay.classList.add('hidden');
   loadStage(0);
 }
