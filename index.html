@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>서율 메트로 라이트 - 지하철 전기 복구 퍼즐</title>
+<style>
+  /* ===================== 기본 리셋 ===================== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+
+  /* ===================== 색상 변수 ===================== */
+  :root{
+    --bg-deep1:#0a0620;
+    --bg-deep2:#1a0f45;
+    --bg-deep3:#2a1763;
+    --purple-dim:#3b2a6d;
+    --purple-dim-light:#4c3690;
+    --mint:#6ffbe3;
+    --mint-soft:rgba(111,251,227,0.85);
+    --cyan:#63e8ff;
+    --gold:#ffd76a;
+    --text-light:#f3eeff;
+    --text-dim:#9f94c9;
+  }
+
+  /* ===================== 전체 배경 (PC에서도 모바일 화면처럼) ===================== */
+  body{
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    background: radial-gradient(circle at 20% 0%, rgba(99,70,200,0.35), transparent 55%),
+                radial-gradient(circle at 85% 90%, rgba(111,251,227,0.12), transparent 50%),
+                linear-gradient(160deg, var(--bg-deep1), var(--bg-deep2) 55%, var(--bg-deep3));
+  }
+
+  /* 모바일 게임 화면처럼 보이게 하는 중앙 프레임 */
+  .phone-frame{
+    width: 100%;
+    max-width: 420px;
+    min-height: 760px;
+    max-height: 880px;
+    border-radius: 34px;
+    overflow: hidden;
+    position: relative;
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,0.05) inset,
+      0 0 40px rgba(99,70,200,0.25),
+      0 30px 70px rgba(0,0,0,0.55);
+    background: linear-gradient(180deg, #110a30 0%, #180e3c 45%, #130a30 100%);
+    display: flex;
+    flex-direction: column;
+  }
+  @media (max-height: 780px){
+    .phone-frame{ min-height: 94vh; max-height: 96vh; }
+  }
+  @media (max-width: 420px){
+    .phone-frame{ border-radius: 0px; min-height: 100vh; max-height: 100vh; }
+    body{ padding: 0; }
+  }
+
+  /* 사운드 설정 영역 (화면 우상단에 고정) */
+  .sound-panel-wrap{
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 20;
+  }
+  .sound-toggle-btn{
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: var(--text-light);
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease;
+  }
+  .sound-toggle-btn:active{ transform: scale(0.88); }
+  .sound-toggle-btn.muted{ color: var(--text-dim); }
+
+  /* 효과음 / 배경음악을 각각 조절하는 드롭다운 패널 */
+  .sound-panel{
+    position: absolute;
+    top: 48px;
+    right: 0;
+    width: 196px;
+    background: linear-gradient(160deg, #1c1140, #130a30);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 14px 14px 10px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  }
+  .sound-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .sound-row:last-child{ margin-bottom: 0; }
+  .sound-row-label{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+  .sound-row-title{
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+  }
+  .sound-mute-btn{
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    color: var(--text-light);
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .sound-mute-btn.muted{ color: var(--text-dim); }
+  .sound-slider{
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.15);
+    outline: none;
+  }
+  .sound-slider::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--mint), var(--cyan));
+    box-shadow: 0 0 6px rgba(111,251,227,0.8);
+    cursor: pointer;
+  }
+  .sound-slider::-moz-range-thumb{
+    width: 16px; height: 16px;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--mint), var(--cyan));
+    box-shadow: 0 0 6px rgba(111,251,227,0.8);
+    cursor: pointer;
+  }
+
+  .game-screen{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 18px 0;
+    overflow: hidden;
+  }
+
+  /* ===================== 헤더 ===================== */
+  .game-header{ text-align: center; flex-shrink: 0; }
+  .game-title{
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text-light);
+    text-shadow: 0 0 8px rgba(111,251,227,0.7), 0 0 20px rgba(130,90,230,0.6);
+  }
+  .game-subtitle{
+    margin: 4px 0 12px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+  .stage-info{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 6px 16px;
+    border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .stage-badge{
+    font-size: 0.68rem;
+    color: var(--bg-deep1);
+    background: linear-gradient(135deg, var(--mint), var(--cyan));
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+  .stage-name{
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--mint);
+    text-shadow: 0 0 10px rgba(111,251,227,0.5);
+  }
+
+  /* ===================== 메인(퍼즐판) ===================== */
+  .game-main{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .board-wrap{
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  .board{
+    display: grid;
+    gap: 6px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    padding: 10px;
+    border-radius: 22px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(0,0,0,0.25));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 0 30px rgba(40,20,90,0.5) inset;
+  }
+
+  .cell-empty{ background: transparent; }
+
+  /* 타일 하나 (둥근 사각형 카드) */
+  .tile{
+    position: relative;
+    border-radius: 20%;
+    background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    overflow: visible; /* 연결 순간의 스파크/링 이펙트가 타일 밖으로 살짝 퍼질 수 있게 */
+  }
+  .tile:active{ transform: scale(0.90); }
+  .tile.role-power{ border-color: rgba(255,215,100,0.55); }
+  .tile.role-station{ border-color: rgba(111,251,227,0.3); }
+  .tile.role-station.lit{
+    border-color: var(--mint);
+    box-shadow: 0 0 16px rgba(111,251,227,0.6);
+  }
+  .tile.cleared{ cursor: default; }
+
+  /* 선로(트랙) 래퍼 - 이 부분만 회전해서 "회전" 애니메이션 표현 */
+  .tile-track{
+    position: absolute;
+    inset: 0;
+    transition: transform 0.22s cubic-bezier(.4,1.8,.5,1);
+    transform-origin: 50% 50%;
+  }
+
+  /* 선로 막대 (기본 = 어두운 보라색 / 미연결) */
+  .bar{
+    position: absolute;
+    background: var(--purple-dim);
+    border-radius: 5px;
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+  }
+  .bar-N{ top: 0; left: 50%; width: 24%; height: 54%; transform: translateX(-50%); }
+  .bar-S{ bottom: 0; left: 50%; width: 24%; height: 54%; transform: translateX(-50%); }
+  .bar-E{ top: 50%; right: 0; height: 24%; width: 54%; transform: translateY(-50%); }
+  .bar-W{ top: 50%; left: 0; height: 24%; width: 54%; transform: translateY(-50%); }
+  /* 대각선 선로: N 막대(위쪽 끝=타일 중심 근처)와 동일한 모양을 중심(바닥 끝)을 축으로
+     45도 단위로 돌려서 NE/SE/SW/NW 네 방향을 모두 만든다 (N=0deg 기준 시계방향 45도씩) */
+  .bar-NE, .bar-SE, .bar-SW, .bar-NW{
+    top: 0; left: 50%; width: 24%; height: 54%;
+    margin-left: -12%; /* width의 절반만큼 왼쪽으로 밀어 가로 중앙 정렬 (translateX 대신 margin 사용해 회전과 충돌 방지) */
+    transform-origin: 50% 100%; /* 회전축 = 막대의 바닥 끝(타일 중심 부근) */
+  }
+  .bar-NE{ transform: rotate(45deg); }
+  .bar-SE{ transform: rotate(135deg); }
+  .bar-SW{ transform: rotate(225deg); }
+  .bar-NW{ transform: rotate(315deg); }
+
+  .tile-center{
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 32%; height: 32%;
+    border-radius: 50%;
+    background: var(--purple-dim);
+    transform: translate(-50%,-50%);
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  /* 전력이 흐르는 상태 (연결됨) → 민트/하늘색으로 빛남 */
+  .tile.energized .bar{
+    background: linear-gradient(90deg, var(--mint), var(--cyan));
+    box-shadow: 0 0 8px rgba(111,251,227,0.9);
+  }
+  .tile.energized .tile-center{
+    background: linear-gradient(135deg, var(--mint), var(--cyan));
+    box-shadow: 0 0 10px rgba(111,251,227,1);
+  }
+
+  /* 아이콘 레이어 (회전하지 않고 항상 바로 서 있음) */
+  .tile-icon{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .icon-power{
+    font-size: 1.3rem;
+    color: var(--gold);
+    text-shadow: 0 0 10px rgba(255,215,100,0.9);
+    animation: powerPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes powerPulse{
+    0%,100%{ transform: scale(1); }
+    50%{ transform: scale(1.12); }
+  }
+
+  .station-dot{
+    width: 34%; height: 34%;
+    border-radius: 50%;
+    border: 2.5px solid var(--purple-dim-light);
+    background: rgba(59,42,109,0.6);
+    display: block;
+    transition: all 0.25s ease;
+  }
+  .tile.role-station.lit .station-dot{
+    border-color: var(--mint);
+    background: radial-gradient(circle, #fff, var(--mint) 60%);
+    box-shadow: 0 0 12px rgba(111,251,227,1);
+  }
+  .tile.role-station.pop .station-dot{
+    animation: stationPop 0.5s ease;
+  }
+  @keyframes stationPop{
+    0%{ transform: scale(1); }
+    40%{ transform: scale(1.5); }
+    100%{ transform: scale(1); }
+  }
+
+  /* ===================== 연결되는 순간의 이펙트 ===================== */
+  /* 어떤 타일이든 처음으로 전기가 들어오면, 타일 전체에 번쩍이는 플래시가 퍼진다 */
+  .tile.spark-flash::after{
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95), rgba(111,251,227,0.55) 45%, transparent 75%);
+    animation: sparkFlash 0.5s ease-out forwards;
+    pointer-events: none;
+    z-index: 4;
+  }
+  @keyframes sparkFlash{
+    0%{ opacity: 1; transform: scale(0.35); }
+    55%{ opacity: 0.9; transform: scale(1.15); }
+    100%{ opacity: 0; transform: scale(1.5); }
+  }
+
+  /* 역이 복구되는 순간: 중심에서 사방으로 퍼지는 링 + 스파크 파티클 (JS가 동적으로 생성) */
+  .connect-burst{
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 0; height: 0;
+    pointer-events: none;
+    z-index: 6;
+  }
+  .connect-burst .burst-ring{
+    position: absolute;
+    top: 0; left: 0;
+    width: 10px; height: 10px;
+    margin: -5px 0 0 -5px;
+    border: 2px solid var(--mint);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(111,251,227,0.9);
+    animation: burstRing 0.55s ease-out forwards;
+  }
+  @keyframes burstRing{
+    0%{ width: 10px; height: 10px; margin: -5px 0 0 -5px; opacity: 1; }
+    100%{ width: 74px; height: 74px; margin: -37px 0 0 -37px; opacity: 0; }
+  }
+  .connect-burst .burst-spark{
+    position: absolute;
+    top: 0; left: 0;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px rgba(255,255,255,0.95), 0 0 10px rgba(111,251,227,0.85);
+    animation: burstSpark 0.5s ease-out forwards;
+  }
+  @keyframes burstSpark{
+    0%{ transform: translate(0, 0) scale(1); opacity: 1; }
+    100%{ transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+  }
+
+  /* 클리어 시 실제 복구된 노선을 따라 움직이는 작은 기차 */
+  /* 위치는 JS에서 실제 선로 좌표를 계산해 Web Animations API로 제어함 */
+  .train-sprite{
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 1.5rem;
+    opacity: 0;
+    pointer-events: none;
+    filter: drop-shadow(0 0 8px rgba(111,251,227,0.9));
+    transition: opacity 0.3s ease;
+    z-index: 5;
+    will-change: transform;
+  }
+  .train-sprite.run{ opacity: 1; }
+
+  /* ===================== 상태 메시지 ===================== */
+  .status-message{
+    margin: 2px 0 0;
+    text-align: center;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-light);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 999px;
+    padding: 8px 16px;
+    min-width: 60%;
+  }
+
+  /* ===================== 버튼 영역 ===================== */
+  .action-area{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+  .btn{
+    width: 80%;
+    max-width: 280px;
+    min-height: 48px;
+    border: none;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+  }
+  .btn:active{ transform: scale(0.96); }
+  .next-btn{
+    background: linear-gradient(135deg, var(--mint), var(--cyan));
+    color: #0a0620;
+    box-shadow: 0 0 18px rgba(111,251,227,0.6);
+  }
+  .restart-btn{
+    background: rgba(255,255,255,0.06);
+    color: var(--text-light);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .hidden{ display: none !important; }
+
+  .all-clear-banner{
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--gold);
+    text-shadow: 0 0 14px rgba(255,215,100,0.8);
+    animation: bannerGlow 1.4s ease-in-out infinite;
+  }
+  @keyframes bannerGlow{
+    0%,100%{ opacity: 0.85; }
+    50%{ opacity: 1; }
+  }
+
+  /* ===================== 광고 영역 ===================== */
+  .ad-spacer{ height: 34px; flex-shrink: 0; } /* 버튼과 광고 사이 여백 (오클릭 방지) */
+  .ad-banner{
+    flex-shrink: 0;
+    margin: 0 18px 16px;
+    min-height: 56px;
+    border: 1.5px dashed rgba(255,255,255,0.18);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.35);
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    background: rgba(255,255,255,0.02);
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+  <!-- 사운드 설정: 버튼을 누르면 효과음/배경음악을 각각 조절하는 패널이 펼쳐짐 -->
+  <div class="sound-panel-wrap">
+    <button class="sound-toggle-btn" id="soundToggleBtn" aria-label="사운드 설정 열기">🔊</button>
+    <div class="sound-panel hidden" id="soundPanel">
+      <div class="sound-row">
+        <button class="sound-mute-btn" id="sfxMuteBtn" aria-label="효과음 켜기/끄기">🔔</button>
+        <div class="sound-row-label">
+          <span class="sound-row-title">효과음</span>
+          <input type="range" class="sound-slider" id="sfxVolumeSlider" min="0" max="100" value="70">
+        </div>
+      </div>
+      <div class="sound-row">
+        <button class="sound-mute-btn" id="musicMuteBtn" aria-label="배경음악 켜기/끄기">🎵</button>
+        <div class="sound-row-label">
+          <span class="sound-row-title">배경음악</span>
+          <input type="range" class="sound-slider" id="musicVolumeSlider" min="0" max="100" value="40">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="game-screen">
+
+    <!-- 헤더: 게임 제목 + 스테이지명 -->
+    <header class="game-header">
+      <h1 class="game-title">⚡ 서율 메트로 라이트</h1>
+      <p class="game-subtitle">정전된 가상도시 서율의 지하철을 복구하라</p>
+      <div class="stage-info">
+        <span class="stage-badge" id="stageBadge">1/5</span>
+        <p class="stage-name" id="stageName">서율 순환선</p>
+      </div>
+    </header>
+
+    <!-- 메인: 퍼즐판 + 상태메시지 + 버튼 -->
+    <main class="game-main">
+      <div class="board-wrap" id="boardWrap">
+        <div class="board" id="board"></div>
+        <span class="train-sprite" id="trainSprite">🚆</span>
+      </div>
+
+      <p class="status-message" id="statusMessage">노선을 복구하세요</p>
+
+      <div class="action-area">
+        <button class="btn next-btn hidden" id="nextBtn">다음 노선 ▶</button>
+        <button class="btn restart-btn" id="restartBtn">처음부터 다시</button>
+        <p class="all-clear-banner hidden" id="allClearBanner">🎉 모든 노선 복구 완료! 🎉</p>
+      </div>
+    </main>
+
+    <!-- 광고 영역 (실제 광고 코드 없음, placeholder만) -->
+    <div class="ad-spacer"></div>
+    <div class="ad-banner">광고 영역</div>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   서율 메트로 라이트 - 전기 연결 퍼즐 게임 로직
+   ------------------------------------------------------------------------
+   - 각 타일은 N/NE/E/SE/S/SW/W/NW 8방향(직선 4방향 + 대각선 4방향) 비트마스크로 연결 상태를 표현
+   - 타일을 클릭하면 45도씩 시계방향으로 회전 (비트마스크도 함께 회전, 8방향 원형에서 1칸씩 이동 -> 8단계 모두 사용)
+   - 전원역에서 BFS로 연결된 타일을 탐색해 "통전" 여부를 계산 (대각선으로도 전지 가능)
+   - 모든 일반역이 통전되면 클리어
+========================================================================= */
+
+// ------------------- 방향/비트 상수 -------------------
+// 직선 4방향(N/E/S/W)에 대각선 4방향(NE/SE/SW/NW)을 추가해 총 8방향으로 확장.
+// 배열 순서가 시계방향 원형을 이뤄야 회전 계산(1칸 이동 = 45도)이 정확히 동작함
+const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const BIT = { N: 1, NE: 2, E: 4, SE: 8, S: 16, SW: 32, W: 64, NW: 128 };
+const OPPOSITE_DIR = {
+  N: 'S', S: 'N', E: 'W', W: 'E',
+  NE: 'SW', SW: 'NE', SE: 'NW', NW: 'SE',
+};
+// 각 방향으로 이동했을 때의 (row, col) 변화량 (대각선은 row와 col이 동시에 ±1씩 이동)
+const DELTA = {
+  N: [-1, 0], NE: [-1, 1], E: [0, 1], SE: [1, 1],
+  S: [1, 0], SW: [1, -1], W: [0, -1], NW: [-1, -1],
+};
+
+// 45도 시계방향 회전: 8방향 원형에서 각 방향이 1칸씩 시계방향으로 이동 (예: N->NE, NE->E, E->SE ...)
+// 클릭 한 번 = 이 함수 한 번 호출 = 45도. 8번 누르면 원래 모양으로 돌아옴(8단계 회전).
+function rotateMask45CW(mask) {
+  let result = 0;
+  DIRS.forEach((dir, i) => {
+    if (mask & BIT[dir]) {
+      const nextDir = DIRS[(i + 1) % DIRS.length];
+      result |= BIT[nextDir];
+    }
+  });
+  return result;
+}
+
+// 비트 개수(연결 방향 개수) 세기
+function countBits(mask) {
+  let c = 0;
+  for (let i = 0; i < DIRS.length; i++) if (mask & (1 << i)) c++;
+  return c;
+}
+
+// ------------------- 스테이지 데이터 -------------------
+// edges: [r1,c1,r2,c2] 형태로 "정답 상태"에서 서로 연결된 인접 타일을 나열.
+// power: 전원역 좌표 [r,c]  /  stations: 일반역 좌표 배열
+// 이 배열에 항목을 추가하면 새로운 스테이지를 쉽게 늘릴 수 있음.
+const STAGES = [
+  {
+    name: '서율 순환선',
+    rows: 4, cols: 4,
+    power: [0, 0],
+    stations: [[2, 3]],
+    edges: [
+      [0, 0, 0, 1],
+      [0, 1, 0, 2],
+      [0, 2, 1, 2],
+      [1, 2, 2, 2],
+      [2, 2, 2, 3],
+    ],
+  },
+  {
+    name: '도원 중앙선',
+    rows: 4, cols: 4,
+    power: [0, 1],
+    stations: [[1, 3], [3, 1]],
+    edges: [
+      [0, 1, 1, 1],
+      [1, 1, 1, 2],
+      [1, 2, 1, 3],
+      [1, 1, 2, 1],
+      [2, 1, 3, 1],
+    ],
+  },
+  {
+    name: '강림 남부선',
+    rows: 5, cols: 5,
+    power: [2, 0],
+    stations: [[0, 2], [2, 4], [4, 2]],
+    edges: [
+      [2, 0, 2, 1],
+      [2, 1, 2, 2],
+      [2, 2, 1, 2],
+      [1, 2, 0, 2],
+      [2, 2, 2, 3],
+      [2, 3, 2, 4],
+      [2, 2, 3, 2],
+      [3, 2, 4, 2],
+    ],
+  },
+  {
+    name: '여울 수변선',
+    rows: 5, cols: 5,
+    power: [2, 2],
+    stations: [[2, 0], [0, 2], [2, 3], [4, 2]],
+    edges: [
+      [2, 2, 2, 1],
+      [2, 1, 2, 0],
+      [2, 2, 1, 2],
+      [1, 2, 0, 2],
+      [1, 2, 1, 3],
+      [1, 3, 2, 3],
+      [2, 2, 3, 2],
+      [3, 2, 4, 2],
+    ],
+  },
+  {
+    name: '성류 공업선',
+    rows: 5, cols: 5,
+    power: [2, 2],
+    stations: [[0, 2], [0, 1], [4, 2], [2, 4], [2, 0]],
+    edges: [
+      [2, 2, 1, 2],
+      [1, 2, 0, 2],
+      [1, 2, 1, 1],
+      [1, 1, 0, 1],
+      [2, 2, 3, 2],
+      [3, 2, 4, 2],
+      [2, 2, 2, 3],
+      [2, 3, 2, 4],
+      [2, 2, 2, 1],
+      [2, 1, 2, 0],
+    ],
+  },
+  {
+    // 새로 추가된 "대각선 연결" 스테이지: 전원역을 중심으로 네 모서리 역까지
+    // 대각선(NE/SE/SW/NW) 선로만으로 뻗어나가는 X자 모양의 노선.
+    // 전원역 타일은 네 대각선 방향이 모두 열린 "대각 교차" 타일이 된다.
+    name: '빛가람 대각선',
+    rows: 5, cols: 5,
+    power: [2, 2],
+    stations: [[0, 0], [0, 4], [4, 0], [4, 4]],
+    edges: [
+      [2, 2, 1, 1], [1, 1, 0, 0], // 좌상단(NW) 방향 대각선 팔
+      [2, 2, 1, 3], [1, 3, 0, 4], // 우상단(NE) 방향 대각선 팔
+      [2, 2, 3, 1], [3, 1, 4, 0], // 좌하단(SW) 방향 대각선 팔
+      [2, 2, 3, 3], [3, 3, 4, 4], // 우하단(SE) 방향 대각선 팔
+    ],
+  },
+  {
+    // 신규: "혼합 꺾임" 스테이지. 전원역에서 네 방향으로 뻗어나가되, 각 갈림길 중간에
+    // 직선(N/S/E/W)과 대각선(NE/SE/SW/NW)이 한 타일 안에서 섞여 꺾이는 구간을 넣었다.
+    // 이런 타일은 90도(4단계)만으로는 절대 맞출 수 없고, 반드시 45도 단위(8단계) 회전이 필요하다.
+    name: '노을 갈림선',
+    rows: 5, cols: 5,
+    power: [2, 2],
+    stations: [[0, 3], [4, 0], [4, 3], [2, 0]],
+    edges: [
+      // 가지 1: 대각선(NE)으로 뻗다가 직선(N)으로 꺾여 역에 도착 -> 꺾이는 타일은 SW+N 혼합
+      [2, 2, 1, 3], [1, 3, 0, 3],
+      // 가지 2: 대각선(SW)으로 뻗다가 직선(S)->직선(W)로 두 번 꺾여 도착 -> 첫 꺾임은 NE+S 혼합
+      [2, 2, 3, 1], [3, 1, 4, 1], [4, 1, 4, 0],
+      // 가지 3: 대각선(SE)으로 뻗다가 직선(S)로 꺾여 도착 -> 꺾이는 타일은 NW+S 혼합
+      [2, 2, 3, 3], [3, 3, 4, 3],
+      // 가지 4: 순수 직선(W) 2칸 -> 기존 4방향 감각과 비교할 수 있는 대조군
+      [2, 2, 2, 1], [2, 1, 2, 0],
+    ],
+  },
+];
+
+// ------------------- 상태 생성 -------------------
+
+// 타일이 처음부터 "이미 풀린 상태"로 시작하지 않도록 초기 회전값을 정함.
+// baseMask를 1~7번(45도씩) 회전시켜봤을 때 원래 모양(baseMask)과 달라지는 회전값만 후보로 삼고,
+// 그 중 하나를 무작위로 고른다. (완전 대칭형이라 1~7 회전 모두 원래와 같아지는 타일은 0을 반환)
+function pickInitialRotation(baseMask) {
+  const candidates = [];
+  for (let rot = 1; rot <= 7; rot++) {
+    let m = baseMask;
+    for (let i = 0; i < rot; i++) m = rotateMask45CW(m);
+    if (m !== baseMask) candidates.push(rot);
+  }
+  if (candidates.length === 0) return 0; // 완전 대칭형: 어떤 회전이든 모양이 같음
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+// 좌표 키 생성
+function keyOf(r, c) { return r + ',' + c; }
+
+// edges 데이터를 바탕으로 각 타일의 "정답 방향 비트마스크"를 계산하고
+// 역할(전원역/일반역/선로)과 랜덤 초기 회전을 부여해 스테이지 상태를 만든다
+function constructState(def) {
+  const cellMap = {};
+  function ensureCell(r, c) {
+    const k = keyOf(r, c);
+    if (!cellMap[k]) cellMap[k] = { r, c, baseMask: 0, role: 'track' };
+    return cellMap[k];
+  }
+
+  def.edges.forEach(([r1, c1, r2, c2]) => {
+    const a = ensureCell(r1, c1);
+    const b = ensureCell(r2, c2);
+    const dr = r2 - r1, dc = c2 - c1;
+    // DELTA 테이블에서 (dr, dc)와 일치하는 방향을 찾음 (직선 4방향 + 대각선 4방향 모두 지원)
+    const dir = DIRS.find(d => DELTA[d][0] === dr && DELTA[d][1] === dc);
+    if (!dir) return; // 인접하지 않은 좌표(8방향 밖)는 무시 (데이터 오류 방지)
+    a.baseMask |= BIT[dir];
+    b.baseMask |= BIT[OPPOSITE_DIR[dir]];
+  });
+
+  const [pr, pc] = def.power;
+  ensureCell(pr, pc).role = 'power';
+  def.stations.forEach(([r, c]) => { ensureCell(r, c).role = 'station'; });
+
+  const cells = Object.values(cellMap);
+  cells.forEach(cell => { cell.rotation = pickInitialRotation(cell.baseMask); });
+
+  return {
+    name: def.name,
+    rows: def.rows,
+    cols: def.cols,
+    cells,
+    powerKey: keyOf(pr, pc),
+    cleared: false,
+  };
+}
+
+// 혹시 랜덤으로 처음부터 전부 연결돼버리는 경우를 막기 위한 안전장치
+function buildStageState(def) {
+  let state = constructState(def);
+  for (let attempt = 0; attempt < 15; attempt++) {
+    computeEnergized(state);
+    const total = state.cells.filter(c => c.role === 'station').length;
+    const lit = state.cells.filter(c => c.role === 'station' && c.energized).length;
+    if (lit < total) break; // 아직 풀리지 않은 상태 → 정상
+    state = constructState(def); // 다시 랜덤 생성
+  }
+  return state;
+}
+
+// 현재 회전 상태를 반영한 실제 연결 방향 비트마스크
+function currentMask(cell) {
+  let m = cell.baseMask;
+  for (let i = 0; i < cell.rotation; i++) m = rotateMask45CW(m);
+  return m;
+}
+
+// 전원역에서 BFS로 퍼져나가며 "통전된" 타일을 표시
+// parentKey도 함께 기록해두면, 클리어 시 기차가 지나갈 실제 경로(Euler tour)를 만들 수 있음
+function computeEnergized(state) {
+  const byKey = {};
+  state.cells.forEach(c => { byKey[keyOf(c.r, c.c)] = c; c.energized = false; c.parentKey = null; });
+
+  const start = byKey[state.powerKey];
+  if (!start) return;
+  start.energized = true;
+  const queue = [start];
+
+  while (queue.length) {
+    const cur = queue.shift();
+    const mask = currentMask(cur);
+    DIRS.forEach(dir => {
+      if (!(mask & BIT[dir])) return;
+      const [dr, dc] = DELTA[dir];
+      const neighbor = byKey[keyOf(cur.r + dr, cur.c + dc)];
+      if (!neighbor || neighbor.energized) return;
+      const neighborMask = currentMask(neighbor);
+      // 상대 타일도 나를 향한 방향(반대 방향)으로 열려 있어야 실제로 연결됨
+      if (neighborMask & BIT[OPPOSITE_DIR[dir]]) {
+        neighbor.energized = true;
+        neighbor.parentKey = keyOf(cur.r, cur.c);
+        queue.push(neighbor);
+      }
+    });
+  }
+}
+
+// 통전된 타일들로 이루어진 트리를 깊이우선(Euler tour) 방식으로 순회해,
+// 전원역 -> 모든 연결된 선로/역을 빠짐없이 지나가며 분기점으로 되돌아오는 좌표 순서를 만든다.
+// 인접한 칸끼리만 이동하므로, 기차가 실제로 복구된 선로 위만 밟고 지나가게 된다.
+function buildEulerTour(state) {
+  const byKey = {};
+  state.cells.forEach(c => { byKey[keyOf(c.r, c.c)] = c; });
+
+  // 부모 -> 자식들 매핑 생성 (BFS 트리 구조)
+  const childrenMap = {};
+  state.cells.forEach(c => {
+    if (c.energized && c.parentKey) {
+      if (!childrenMap[c.parentKey]) childrenMap[c.parentKey] = [];
+      childrenMap[c.parentKey].push(c);
+    }
+  });
+
+  const tour = [];
+  function visit(cell) {
+    tour.push(cell);
+    const children = childrenMap[keyOf(cell.r, cell.c)] || [];
+    children.forEach(child => {
+      visit(child);
+      tour.push(cell); // 자식 쪽 지선을 다 지나면 분기점으로 되돌아옴
+    });
+  }
+
+  const root = byKey[state.powerKey];
+  if (root) visit(root);
+  return tour;
+}
+
+// ------------------- 화면 렌더링 -------------------
+
+const boardEl = document.getElementById('board');
+const boardWrap = document.getElementById('boardWrap');
+const stageNameEl = document.getElementById('stageName');
+const stageBadgeEl = document.getElementById('stageBadge');
+const statusEl = document.getElementById('statusMessage');
+const nextBtn = document.getElementById('nextBtn');
+const restartBtn = document.getElementById('restartBtn');
+const allClearBanner = document.getElementById('allClearBanner');
+const trainSprite = document.getElementById('trainSprite');
+const soundToggleBtn = document.getElementById('soundToggleBtn');
+const soundPanel = document.getElementById('soundPanel');
+const sfxMuteBtn = document.getElementById('sfxMuteBtn');
+const musicMuteBtn = document.getElementById('musicMuteBtn');
+const sfxVolumeSlider = document.getElementById('sfxVolumeSlider');
+const musicVolumeSlider = document.getElementById('musicVolumeSlider');
+
+let currentStageIndex = 0;
+let currentState = null;
+let trainAnimation = null; // 진행 중인 기차 애니메이션(Web Animations API) 참조
+
+// 타일 회전 CSS transition(0.22s)과 동일하게 맞춘 지연 시간.
+// 클릭 즉시가 아니라, 회전이 "딱" 끝나서 선로가 맞물리는 순간에만 통전 판정 + 전기음이 울리게 함.
+const TILE_ROTATE_MS = 230;
+
+/* =========================================================================
+   오디오 - 외부 음원 파일 없이 Web Audio API로 모든 소리를 직접 합성
+   - SFX: 타일 회전 "틱", 역 연결 "팅" 벨 사운드, 클리어 팡파레
+   - BGM: Am-F-C-G 코드 진행을 오가는 베이스 + 오르내리는 아르페지오 +
+     은은한 킥 펄스로 구성된, 단조롭지 않게 움직이는 네온 나이트 루프
+   - 효과음(sfxBus)과 배경음악(musicBus)은 서로 독립된 마스터 게인을 가져서
+     각각 음소거 / 볼륨을 따로 조절할 수 있다.
+========================================================================= */
+let audioCtx = null;
+let sfxBus = null;   // 효과음 전용 마스터 게인
+let musicBus = null; // 배경음악 전용 마스터 게인
+let musicNodes = null;      // 현재 재생 중인 베이스/패드 오실레이터들
+let musicTimer = null;      // 아르페지오 반복 재생용 타이머
+let musicKickTimer = null;  // 킥 펄스 반복 재생용 타이머
+
+// 코드 진행: Am -> F -> C -> G (네온 신스웨이브에 흔히 쓰이는 전개감 있는 진행)
+// bass: 저음 베이스 1개, arp: 아르페지오가 오르내릴 4개 음
+const CHORD_PROGRESSION = [
+  { bass: 55.00, arp: [220.00, 261.63, 329.63, 440.00] }, // Am
+  { bass: 43.65, arp: [174.61, 220.00, 261.63, 349.23] }, // F
+  { bass: 65.41, arp: [261.63, 329.63, 392.00, 523.25] }, // C
+  { bass: 49.00, arp: [196.00, 246.94, 293.66, 392.00] }, // G
+];
+
+// 효과음/배경음악 각각의 "슬라이더 볼륨(0~1)"과 "음소거 여부"를 따로 관리
+const sfxState = { volume: 0.7, muted: false };
+const musicState = { volume: 0.4, muted: false };
+const MUSIC_MAX_GAIN = 0.28; // 배경음악 슬라이더 100%일 때의 실제 최대 볼륨 (효과음보다 작게)
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function ensureAudioBuses(ctx) {
+  if (!sfxBus) {
+    sfxBus = ctx.createGain();
+    sfxBus.gain.value = sfxState.muted ? 0 : sfxState.volume;
+    sfxBus.connect(ctx.destination);
+  }
+  if (!musicBus) {
+    musicBus = ctx.createGain();
+    musicBus.gain.value = musicState.muted ? 0 : musicState.volume * MUSIC_MAX_GAIN;
+    musicBus.connect(ctx.destination);
+  }
+}
+
+// 효과음 버스의 실제 볼륨을 현재 슬라이더 값 + 음소거 상태에 맞춰 갱신
+function applySfxGain() {
+  if (sfxBus) sfxBus.gain.value = sfxState.muted ? 0 : sfxState.volume;
+}
+
+// 배경음악 버스의 실제 볼륨을 현재 슬라이더 값 + 음소거 상태에 맞춰 갱신
+function applyMusicGain() {
+  if (musicBus) musicBus.gain.value = musicState.muted ? 0 : musicState.volume * MUSIC_MAX_GAIN;
+}
+
+// 상단 스피커 아이콘은 "효과음과 배경음악 둘 다 꺼져 있는지"를 보여준다
+function refreshMasterIcon() {
+  const allMuted = sfxState.muted && musicState.muted;
+  soundToggleBtn.textContent = allMuted ? '🔇' : '🔊';
+  soundToggleBtn.classList.toggle('muted', allMuted);
+}
+
+// 오실레이터 하나로 짧은 톤을 만들어 sfxBus로 재생
+// freq: 주파수(Hz), duration: 길이(초), type: 파형, volume: 0~1, delay: 시작 지연(초)
+function playTone(freq, duration, type, volume, delay) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  ensureAudioBuses(ctx);
+  try {
+    const t0 = ctx.currentTime + (delay || 0);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(volume != null ? volume : 0.2, t0 + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(sfxBus);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  } catch (e) {
+    // 오디오 재생에 실패해도 게임 진행에는 영향 없음
+  }
+}
+
+// 타일을 회전할 때 나는 짧은 클릭음 (살짝 더 밝고 또렷하게)
+function playRotateSound() {
+  playTone(340, 0.07, 'square', 0.12, 0);
+}
+
+// 선로가 "딱" 맞물려 전기가 들어오는 순간 재생되는 사운드
+// 1) 벨 배음("팅~")으로 또렷한 타격감을 주고,
+// 2) 그 위에 주파수가 순식간에 확 솟았다가(업) 뚝 끊기듯 떨어지는(다운) 전기 서지 스윕을 겹치고,
+// 3) 아주 짧은 노이즈 "지직" 버스트를 섞어서, 전기가 콱 들어왔다가 회로에 안착하는 느낌을 낸다.
+// order: 같은 턴에 여러 역이 동시에 켜질 경우 순서대로 음을 살짝 높여 화음처럼 들리게 함
+function playConnectSound(order) {
+  const n = order || 0;
+  const baseFreq = 880 * Math.pow(1.12, n); // 기본음을 높여 또렷한 "팅" 느낌
+  const t = n * 0.07;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  ensureAudioBuses(ctx);
+
+  // 벨 소리의 배음 구성: [배수비, 상대 볼륨, 길이(초)]
+  const partials = [
+    [1.0, 0.32, 0.35],
+    [2.4, 0.16, 0.22],
+    [3.8, 0.07, 0.14],
+  ];
+  partials.forEach(([ratio, vol, dur]) => {
+    try {
+      const t0 = ctx.currentTime + t;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(baseFreq * ratio, t0);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(vol, t0 + 0.006); // 아주 짧은 어택 -> "딱" 끊어지는 타격감
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(gain);
+      gain.connect(sfxBus);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    } catch (e) {
+      // 오디오 재생 실패해도 게임 진행에는 영향 없음
+    }
+  });
+
+  // 전기 서지 스윕: 낮은 주파수에서 아주 짧게(약 40ms) 급격히 솟구쳤다가,
+  // 그보다 살짝 긴 시간 동안 뚝 떨어지듯 감쇠하는 사각파 -> "지이잉-" 업다운 느낌의 핵심
+  try {
+    const t0 = ctx.currentTime + t;
+    const sweep = ctx.createOscillator();
+    const sweepGain = ctx.createGain();
+    sweep.type = 'square';
+    sweep.frequency.setValueAtTime(220, t0);
+    sweep.frequency.exponentialRampToValueAtTime(1800, t0 + 0.045); // 업: 순식간에 솟구침
+    sweep.frequency.exponentialRampToValueAtTime(90, t0 + 0.22);    // 다운: 뚝 떨어지며 사그라듦
+    sweepGain.gain.setValueAtTime(0.0001, t0);
+    sweepGain.gain.exponentialRampToValueAtTime(0.16, t0 + 0.04); // 업과 동시에 볼륨도 확 커짐
+    sweepGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.24); // 다운과 함께 빠르게 꺼짐
+    sweep.connect(sweepGain);
+    sweepGain.connect(sfxBus);
+    sweep.start(t0);
+    sweep.stop(t0 + 0.26);
+  } catch (e) {
+    // 오디오 재생 실패해도 게임 진행에는 영향 없음
+  }
+
+  // 아주 짧은 "지직" 노이즈 버스트: 전기가 회로에 꽂히는 거친 질감을 더함
+  try {
+    const t0 = ctx.currentTime + t;
+    const noise = ctx.createBufferSource();
+    noise.buffer = getNoiseBuffer(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2200;
+    bp.Q.value = 0.8;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.22, t0);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
+    noise.connect(bp);
+    bp.connect(ng);
+    ng.connect(sfxBus);
+    noise.start(t0);
+    noise.stop(t0 + 0.08);
+  } catch (e) {
+    // 오디오 재생 실패해도 게임 진행에는 영향 없음
+  }
+}
+
+// 스테이지를 모두 복구했을 때 재생되는 신나는 팡파레
+// 도-미-솔-높은도-높은미로 빠르게 치고 올라가고, 각 음에 밝은 스퀘어 배음을 겹쳐
+// 더 화려하고 통통 튀는 "클리어!" 느낌을 낸다.
+function playClearFanfare() {
+  const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+  notes.forEach((freq, i) => playTone(freq, 0.26, 'triangle', 0.24, i * 0.065));
+  notes.forEach((freq, i) => playTone(freq * 2, 0.14, 'square', 0.09, i * 0.065 + 0.015));
+}
+
+// ------------------- 배경음악 (Am-F-C-G 위에서 몰아치는 신나는 신스-팝 루프) -------------------
+//
+// "에너지: 스트레스 격파 루프"류 하이퍼캐주얼 게임의 통통 튀는 에너지감에서 영감을 받아,
+// (음원을 가져다 쓰지 않고 전부 코드로 직접 합성) 다음을 더해 훨씬 신나게 만들었다:
+//   - 템포를 끌어올리고(BEAT_MS 축소), 8스텝 동안 더 역동적으로 오르내리는 아르페지오
+//   - 스퀘어 + 살짝 디튠된 톱니를 겹친 두껍고 밝은 리드 톤
+//   - 매 스텝 쉬지 않고 울리는 킥 + 오프비트 하이햇으로 꽉 찬 리듬
+//   - 킥이 칠 때마다 베이스를 순간적으로 눌렀다가 되돌리는 EDM식 "사이드체인 덕킹" 펌핑감
+const BEAT_MS = 190; // 한 스텝의 길이(ms) - 작을수록 더 빠르고 신나는 템포
+
+// 하이햇 등 타격감 있는 퍼커션에 쓸 노이즈 버퍼 (최초 1회만 만들어 재사용)
+let noiseBuffer = null;
+function getNoiseBuffer(ctx) {
+  if (!noiseBuffer) {
+    const size = ctx.sampleRate * 0.2;
+    noiseBuffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+}
+
+// 짧고 밝은 "치익" 하이햇 - 오프비트에 끼워 넣어 리듬을 촘촘하게 채운다
+function scheduleHiHat(ctx, t0, accent) {
+  const src = ctx.createBufferSource();
+  src.buffer = getNoiseBuffer(ctx);
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 7000;
+  const g = ctx.createGain();
+  const vol = accent ? 0.07 : 0.045;
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+  src.connect(hp);
+  hp.connect(g);
+  g.connect(musicBus);
+  src.start(t0);
+  src.stop(t0 + 0.06);
+}
+
+// 묵직한 킥 펄스 + 베이스를 순간적으로 눌렀다가 되돌리는 사이드체인 덕킹(펌핑감)
+function scheduleKick(ctx, t0, accent) {
+  const kick = ctx.createOscillator();
+  const kg = ctx.createGain();
+  kick.type = 'sine';
+  kick.frequency.setValueAtTime(accent ? 150 : 115, t0);
+  kick.frequency.exponentialRampToValueAtTime(36, t0 + 0.13);
+  kg.gain.setValueAtTime(accent ? 0.24 : 0.15, t0);
+  kg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.17);
+  kick.connect(kg);
+  kg.connect(musicBus);
+  kick.start(t0);
+  kick.stop(t0 + 0.2);
+
+  // 킥이 울리는 순간 베이스 볼륨을 확 낮췄다가 빠르게 복구 -> EDM 특유의 "덕킹" 펌핑감
+  if (musicNodes && musicNodes.bassGain) {
+    const bg = musicNodes.bassGain.gain;
+    const base = 0.065;
+    bg.cancelScheduledValues(t0);
+    bg.setValueAtTime(0.012, t0);
+    bg.linearRampToValueAtTime(base, t0 + (BEAT_MS / 1000) * 0.85);
+  }
+}
+
+function startBackgroundMusic() {
+  const ctx = getAudioCtx();
+  if (!ctx || musicNodes) return; // 오디오 미지원 또는 이미 재생 중이면 무시
+  ensureAudioBuses(ctx);
+
+  // 1) 코드 진행을 따라 음높이가 미끄러지듯 바뀌는 베이스 (사이드체인 덕킹으로 펌핑감 추가)
+  const bassOsc = ctx.createOscillator();
+  const bassGain = ctx.createGain();
+  bassOsc.type = 'sawtooth';
+  bassOsc.frequency.value = CHORD_PROGRESSION[0].bass;
+  bassGain.gain.value = 0.065;
+  bassOsc.connect(bassGain);
+  bassGain.connect(musicBus);
+  bassOsc.start();
+  musicNodes = { bassOsc, bassGain };
+
+  let chordIndex = 0;
+  let arpStep = 0;
+  const STEPS_PER_CHORD = 8; // 코드 블록 하나당 스텝 수
+  // 8스텝 동안 오르내리는 중간에 한 번 더 튀어 오르는 패턴 -> 단조롭지 않고 통통 튀는 느낌
+  const pattern = [0, 1, 2, 3, 2, 3, 1, 0];
+
+  // 2) 매 스텝마다 리드(아르페지오) + 킥 + (오프비트)하이햇을 함께 쏟아내어
+  //    쉴 틈 없이 몰아치는 신나는 루프를 만든다
+  function playStep() {
+    if (!musicNodes) return; // 음악이 멈췄으면 더 이상 예약하지 않음
+    const ctx2 = getAudioCtx();
+    const chord = CHORD_PROGRESSION[chordIndex];
+    const t0 = ctx2.currentTime;
+
+    // 각 코드 블록의 첫 스텝에서 베이스를 그 코드 음으로 부드럽게 이동(글라이드)
+    if (arpStep === 0) {
+      musicNodes.bassOsc.frequency.cancelScheduledValues(t0);
+      musicNodes.bassOsc.frequency.setTargetAtTime(chord.bass, t0, 0.12);
+    }
+
+    const noteIdx = pattern[arpStep % pattern.length];
+    const freq = chord.arp[noteIdx];
+    const dur = (BEAT_MS / 1000) * 0.82;
+
+    // 리드 사운드: 스퀘어(몸통) + 살짝 디튠된 톱니(배음)를 겹쳐 밝고 두꺼운 "신나는" 신스 톤을 만든다
+    [
+      { type: 'square', detune: 0, vol: 0.065 },
+      { type: 'sawtooth', detune: 7, vol: 0.038 },
+    ].forEach(({ type, detune, vol }) => {
+      const osc = ctx2.createOscillator();
+      const g = ctx2.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      osc.detune.value = detune;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g);
+      g.connect(musicBus);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    });
+
+    // 매 스텝 킥을 넣어 쉴 틈 없이 몰아치는 리듬을 만들고, 박의 첫머리(4스텝마다)는 더 세게 강조
+    const isDownbeat = arpStep % 4 === 0;
+    scheduleKick(ctx2, t0, isDownbeat);
+    // 다운비트가 아닌 스텝에는 오프비트 하이햇을 끼워 넣어 리듬을 촘촘하게 채움
+    if (!isDownbeat) scheduleHiHat(ctx2, t0, arpStep % 2 === 1);
+
+    arpStep++;
+    if (arpStep >= STEPS_PER_CHORD) { // 한 코드 블록 끝나면 다음 코드로 진행
+      arpStep = 0;
+      chordIndex = (chordIndex + 1) % CHORD_PROGRESSION.length;
+    }
+    musicTimer = setTimeout(playStep, BEAT_MS);
+  }
+  playStep();
+}
+
+function stopBackgroundMusic() {
+  if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+  if (musicKickTimer) { clearTimeout(musicKickTimer); musicKickTimer = null; }
+  if (musicNodes) {
+    try { musicNodes.bassOsc.stop(); } catch (e) {}
+    musicNodes = null;
+  }
+}
+
+// ------------------- 효과음 / 배경음악 개별 조절 UI -------------------
+
+// 효과음 음소거 토글
+function setSfxMuted(muted) {
+  sfxState.muted = muted;
+  applySfxGain();
+  sfxMuteBtn.textContent = muted ? '🔕' : '🔔';
+  sfxMuteBtn.classList.toggle('muted', muted);
+  refreshMasterIcon();
+}
+
+// 배경음악 음소거 토글
+function setMusicMuted(muted) {
+  musicState.muted = muted;
+  applyMusicGain();
+  musicMuteBtn.textContent = muted ? '🎵' : '🎵';
+  musicMuteBtn.classList.toggle('muted', muted);
+  refreshMasterIcon();
+  // 음소거를 풀고 배경음악이 아직 시작 전이면(오디오가 이미 깨어있는 상태) 바로 재생 시작
+  if (!muted) startBackgroundMusic();
+}
+
+sfxMuteBtn.addEventListener('click', () => setSfxMuted(!sfxState.muted));
+musicMuteBtn.addEventListener('click', () => setMusicMuted(!musicState.muted));
+
+// 슬라이더로 효과음 볼륨 조절 (0~100 -> 0~1)
+sfxVolumeSlider.addEventListener('input', () => {
+  sfxState.volume = Number(sfxVolumeSlider.value) / 100;
+  if (sfxState.muted && sfxState.volume > 0) setSfxMuted(false); // 볼륨을 올리면 자동으로 음소거 해제
+  applySfxGain();
+  playRotateSound(); // 슬라이더를 움직이는 즉시 현재 볼륨을 미리 들어볼 수 있게 샘플 사운드 재생
+});
+
+// 슬라이더로 배경음악 볼륨 조절 (0~100 -> 0~1)
+musicVolumeSlider.addEventListener('input', () => {
+  musicState.volume = Number(musicVolumeSlider.value) / 100;
+  if (musicState.muted && musicState.volume > 0) setMusicMuted(false); // 볼륨을 올리면 자동으로 음소거 해제
+  applyMusicGain();
+  startBackgroundMusic(); // 아직 시작 전이었다면 음악을 켜줌
+});
+
+// 상단 스피커 아이콘 클릭 -> 조절 패널 펼치기/접기
+soundToggleBtn.addEventListener('click', () => {
+  soundPanel.classList.toggle('hidden');
+});
+
+// 패널 바깥(보드, 버튼 등)을 클릭하면 패널을 자동으로 닫음
+document.addEventListener('pointerdown', (e) => {
+  if (!soundPanel.classList.contains('hidden') &&
+      !e.target.closest('.sound-panel-wrap')) {
+    soundPanel.classList.add('hidden');
+  }
+});
+
+// 브라우저는 사용자 제스처 전까지 오디오 재생을 막으므로,
+// 화면을 처음 터치/클릭하는 순간 오디오 컨텍스트를 깨우고 배경음악을 시작한다.
+function unlockAudioOnFirstInteraction() {
+  const ctx = getAudioCtx();
+  if (ctx) {
+    ensureAudioBuses(ctx);
+    if (!musicState.muted) startBackgroundMusic();
+  }
+  document.removeEventListener('pointerdown', unlockAudioOnFirstInteraction);
+}
+document.addEventListener('pointerdown', unlockAudioOnFirstInteraction, { once: true });
+
+// 타일 DOM 요소를 한 번 생성 (바 + 중심점 + 아이콘)
+function createTileElement(cell) {
+  const tile = document.createElement('div');
+  tile.className = 'tile role-' + cell.role;
+
+  const track = document.createElement('div');
+  track.className = 'tile-track';
+  DIRS.forEach(dir => {
+    if (cell.baseMask & BIT[dir]) {
+      const bar = document.createElement('span');
+      bar.className = 'bar bar-' + dir;
+      track.appendChild(bar);
+    }
+  });
+  const center = document.createElement('span');
+  center.className = 'tile-center';
+  track.appendChild(center);
+  tile.appendChild(track);
+
+  // 아이콘은 회전하지 않는 별도 레이어 (항상 바로 서 있음)
+  if (cell.role === 'power') {
+    const icon = document.createElement('span');
+    icon.className = 'tile-icon icon-power';
+    icon.textContent = '⚡';
+    tile.appendChild(icon);
+  } else if (cell.role === 'station') {
+    const icon = document.createElement('span');
+    icon.className = 'tile-icon icon-station';
+    const dot = document.createElement('span');
+    dot.className = 'station-dot';
+    icon.appendChild(dot);
+    tile.appendChild(icon);
+  }
+
+  tile.addEventListener('click', () => onTileClick(cell));
+
+  cell._tileEl = tile;
+  cell._trackEl = track;
+  return tile;
+}
+
+// 보드 전체를 새로 그림 (스테이지 전환 시)
+function renderBoard(state) {
+  boardEl.innerHTML = '';
+  boardEl.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+  boardEl.style.gridTemplateRows = `repeat(${state.rows}, 1fr)`;
+
+  const byKey = {};
+  state.cells.forEach(c => { byKey[keyOf(c.r, c.c)] = c; });
+
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const cell = byKey[keyOf(r, c)];
+      if (cell) {
+        boardEl.appendChild(createTileElement(cell));
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'cell-empty';
+        boardEl.appendChild(empty);
+      }
+    }
+  }
+}
+
+// 타일 중심에서 사방으로 스파크 파티클이 튀는 "연결 버스트" 이펙트를 생성
+// (링 하나 + 작은 스파크 점 여러 개를 DOM으로 만들어 CSS 애니메이션으로 재생 후 제거)
+function spawnConnectBurst(tileEl) {
+  const burst = document.createElement('div');
+  burst.className = 'connect-burst';
+
+  const ring = document.createElement('span');
+  ring.className = 'burst-ring';
+  burst.appendChild(ring);
+
+  const sparkCount = 6;
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = (Math.PI * 2 * i) / sparkCount + (Math.random() - 0.5) * 0.4;
+    const dist = 26 + Math.random() * 10;
+    const spark = document.createElement('span');
+    spark.className = 'burst-spark';
+    spark.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+    spark.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+    burst.appendChild(spark);
+  }
+
+  tileEl.appendChild(burst);
+  setTimeout(() => burst.remove(), 600);
+}
+
+// 타일에 "처음 전기가 들어온 순간" 번쩍이는 플래시 + (역이면) 버스트 파티클을 재생
+function playConnectVisualEffect(cell) {
+  const el = cell._tileEl;
+  el.classList.remove('spark-flash');
+  void el.offsetWidth; // 리플로우 강제 -> 애니메이션 재시작 가능하게 함
+  el.classList.add('spark-flash');
+  setTimeout(() => el.classList.remove('spark-flash'), 520);
+  spawnConnectBurst(el);
+}
+
+// 타일들의 시각 상태(회전/통전 색상)를 갱신하고 통전 역 개수를 반환
+// newlyLit: 이번 클릭으로 "방금 막" 켜진 역 목록 (연결 사운드 재생에 사용)
+// silent: true면 이펙트/사운드 트리거용 newlyLit을 계산하지 않고 상태만 조용히 맞춰둠
+//         (스테이지를 처음 불러올 때, 우연히 이미 연결된 타일에서 이펙트가 터지는 것을 방지)
+function refreshVisuals(state, silent) {
+  computeEnergized(state);
+  let lit = 0, total = 0;
+  const newlyLit = [];
+
+  state.cells.forEach(cell => {
+    cell._trackEl.style.transform = `rotate(${cell.rotation * 45}deg)`;
+    const wasEnergized = cell._wasEnergized;
+    cell._tileEl.classList.toggle('energized', cell.energized);
+
+    // 선로/일반역이 "방금 처음 통전된 순간"이면 스파크 이펙트를 터뜨림 (초기 로드 시에는 조용히 넘어감)
+    if (!silent && cell.energized && !wasEnergized && cell.role !== 'power') {
+      playConnectVisualEffect(cell);
+    }
+    cell._wasEnergized = cell.energized;
+
+    if (cell.role === 'station') {
+      total++;
+      if (cell.energized) lit++;
+      const wasLit = cell._wasLit;
+      cell._tileEl.classList.toggle('lit', cell.energized);
+      if (!silent && cell.energized && !wasLit) {
+        // 방금 막 불이 켜진 순간 -> 반짝 애니메이션 + 사운드 대상에 추가
+        cell._tileEl.classList.add('pop');
+        setTimeout(() => cell._tileEl.classList.remove('pop'), 500);
+        newlyLit.push(cell);
+      }
+      cell._wasLit = cell.energized;
+    }
+  });
+
+  return { lit, total, newlyLit };
+}
+
+let pendingSettleTimer = null; // "회전이 막 끝나는 순간" 통전 판정을 예약해두는 전역 타이머
+
+// 타일 클릭 -> 45도 회전 -> (회전이 끝난 뒤) 통전 재계산
+// 8방향 원형을 전부 활용해 한 번 클릭할 때마다 45도씩(8단계) 회전한다.
+// 회전 모션은 즉시 보여주고, "전기가 들어오는 판정 + 전기음"은 선로가 실제로
+// 맞물리는 시점(CSS 회전 애니메이션이 끝나는 순간)에 맞춰 지연 실행한다.
+function onTileClick(cell) {
+  if (currentState.cleared) return; // 클리어 후에는 회전 불가
+  cell.rotation = (cell.rotation + 1) % 8;
+  playRotateSound(); // 회전 시작 시 짧은 틱 사운드
+  cell._trackEl.style.transform = `rotate(${cell.rotation * 45}deg)`; // 회전 모션 즉시 재생
+
+  // 여러 타일을 연속으로 눌러도, 마지막 회전이 멈춘 뒤 한 번만 통전 판정 + 사운드가 울리게 디바운스
+  clearTimeout(pendingSettleTimer);
+  pendingSettleTimer = setTimeout(updateAfterMove, TILE_ROTATE_MS);
+}
+
+// 회전 후 상태 메시지/클리어 여부 갱신
+function updateAfterMove() {
+  const { lit, total, newlyLit } = refreshVisuals(currentState);
+
+  // 방금 새로 연결된 역이 있으면 역마다 "핑" 전기음을 순서대로 재생
+  newlyLit.forEach((cell, i) => playConnectSound(i));
+
+  if (currentState.cleared) return;
+
+  if (lit === 0) {
+    statusEl.textContent = '노선을 복구하세요';
+  } else if (lit < total) {
+    statusEl.textContent = `${lit}개 역 복구됨 (총 ${total}개)`;
+  }
+
+  if (total > 0 && lit === total) {
+    // 클리어!
+    currentState.cleared = true;
+    statusEl.textContent = `${currentState.name} 복구 완료!`;
+    playClearFanfare();
+    playTrainAnimation();
+    boardEl.querySelectorAll('.tile').forEach(t => t.classList.add('cleared'));
+
+    if (currentStageIndex === STAGES.length - 1) {
+      nextBtn.classList.add('hidden');
+      allClearBanner.classList.remove('hidden');
+    } else {
+      nextBtn.classList.remove('hidden');
+    }
+  }
+}
+
+// 클리어 시 작은 기차가 "실제로 복구된 노선" 위를 따라 처음부터 끝까지 지나가는 애니메이션
+function playTrainAnimation() {
+  const tour = buildEulerTour(currentState); // 전원역에서 시작해 모든 선로를 지나는 좌표 순서
+  if (tour.length === 0) return;
+
+  // 각 셀의 중심 좌표(보드 래퍼 기준 px)를 계산
+  const wrapRect = boardWrap.getBoundingClientRect();
+  const boardRect = boardEl.getBoundingClientRect();
+  const cellW = boardRect.width / currentState.cols;
+  const cellH = boardRect.height / currentState.rows;
+  const offsetX = boardRect.left - wrapRect.left;
+  const offsetY = boardRect.top - wrapRect.top;
+
+  const points = tour.map(cell => ({
+    x: offsetX + cellW * (cell.c + 0.5),
+    y: offsetY + cellH * (cell.r + 0.5),
+  }));
+
+  // 기차 아이콘을 시작점에 배치하고 보이게 전환
+  trainSprite.style.transform = `translate(${points[0].x}px, ${points[0].y}px) translate(-50%, -50%)`;
+  trainSprite.classList.add('run');
+
+  // 이전에 실행 중이던 애니메이션이 있다면 취소
+  if (trainAnimation) trainAnimation.cancel();
+
+  // Web Animations API 키프레임으로 경로 순서를 그대로 따라가게 함
+  const totalSteps = points.length - 1;
+  const stepDuration = 260; // 한 칸 이동에 걸리는 시간(ms) - 전체 속도 조절용
+  const keyframes = points.map((p, i) => ({
+    transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`,
+    offset: totalSteps > 0 ? i / totalSteps : 0,
+  }));
+
+  trainAnimation = trainSprite.animate(keyframes, {
+    duration: Math.max(900, stepDuration * totalSteps),
+    easing: 'linear',
+    iterations: 1,
+    fill: 'forwards',
+  });
+
+  trainAnimation.onfinish = () => {
+    // 경로 끝까지 다 지나가면 서서히 사라짐
+    trainSprite.classList.remove('run');
+  };
+}
+
+// ------------------- 스테이지 로드 / 버튼 처리 -------------------
+
+function loadStage(index) {
+  currentStageIndex = index;
+  const def = STAGES[index];
+  currentState = buildStageState(def);
+
+  stageBadgeEl.textContent = `${index + 1}/${STAGES.length}`;
+  stageNameEl.textContent = def.name;
+  statusEl.textContent = '노선을 복구하세요';
+  nextBtn.classList.add('hidden');
+  allClearBanner.classList.add('hidden');
+  if (trainAnimation) { trainAnimation.cancel(); trainAnimation = null; }
+  trainSprite.classList.remove('run');
+
+  renderBoard(currentState);
+  refreshVisuals(currentState, true); // 초기 배치 상태를 조용히 반영 (이펙트/사운드 없이)
+}
+
+nextBtn.addEventListener('click', () => {
+  if (currentStageIndex + 1 < STAGES.length) {
+    loadStage(currentStageIndex + 1);
+  }
+});
+
+restartBtn.addEventListener('click', () => {
+  loadStage(0);
+});
+
+// ------------------- 게임 시작 -------------------
+refreshMasterIcon();
+loadStage(0);
+</script>
+</body>
+</html>
