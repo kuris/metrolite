@@ -90,6 +90,29 @@
     transition: transform 0.12s ease, background 0.2s ease;
   }
   .sound-toggle-btn:active{ transform: scale(0.88); }
+
+  /* 서율 전체 노선도 토글 버튼 (사운드 버튼 왼쪽에 나란히) */
+  .district-toggle-wrap{
+    position: absolute;
+    top: 14px;
+    right: 62px; /* 14px(사운드 버튼 오른쪽 여백) + 40px(버튼 폭) + 8px(간격) */
+    z-index: 20;
+  }
+  .district-toggle-btn{
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: var(--text-light);
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease;
+  }
+  .district-toggle-btn:active{ transform: scale(0.88); }
   .sound-toggle-btn.muted{ color: var(--text-dim); }
 
   /* 효과음 / 배경음악을 각각 조절하는 드롭다운 패널 */
@@ -555,6 +578,111 @@
   .mode-card.easy .mode-card-badge{ background: rgba(99,232,255,0.15); color: var(--cyan); }
   .mode-card.hard .mode-card-badge{ background: rgba(255,224,102,0.15); color: var(--gold); }
 
+  /* ===================== 서율 전체 노선도 오버레이 ===================== */
+  .district-overlay{
+    position: absolute;
+    inset: 0;
+    z-index: 28; /* 사운드 패널(20)보다 위, 모드 선택 오버레이(30)보다 아래 */
+    display: flex;
+    flex-direction: column;
+    padding: 20px 18px 24px;
+    background: radial-gradient(circle at 50% 0%, rgba(60,150,220,0.25), transparent 55%),
+                linear-gradient(180deg, rgba(8,10,26,0.97), rgba(10,14,36,0.98));
+  }
+  .district-overlay-header{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .district-overlay-title{
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-light);
+    margin: 0;
+    text-shadow: 0 0 8px rgba(77,240,255,0.5);
+  }
+  .district-overlay-subtitle{
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    margin: 4px 0 0;
+    line-height: 1.4;
+  }
+  .district-close-btn{
+    width: 34px; height: 34px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: var(--text-light);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .district-close-btn:active{ transform: scale(0.9); }
+
+  /* 노선 카드가 쌓이는 스크롤 그리드: 420px 폭 프레임 기준 한 줄에 약 4개 */
+  .district-grid{
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    gap: 10px;
+    align-content: start;
+    padding-bottom: 10px;
+  }
+  .district-empty-hint{
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin-top: 40px;
+  }
+
+  /* 노선 카드 하나: 작은 보드 썸네일 + 이름 라벨 */
+  .district-card{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .district-card-board{
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: grid;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(0,0,0,0.3));
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .district-card-label{
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 썸네일 타일은 .tile/.bar/.tile-center 등을 그대로 재사용하되, 눌림 효과만 무효화 */
+  .district-tile:active{ transform: none; }
+
+  /* 방금 추가된 카드에 한 번 번쩍이는 하이라이트 */
+  @keyframes districtNewGlow{
+    0%{ box-shadow: 0 0 0 rgba(77,240,255,0); }
+    30%{ box-shadow: 0 0 22px rgba(77,240,255,0.85); }
+    100%{ box-shadow: 0 0 0 rgba(77,240,255,0); }
+  }
+  .district-card-new .district-card-board{
+    animation: districtNewGlow 0.9s ease-out;
+  }
+
   /* ===================== 하단 여백 (버튼과 화면 끝 사이, 오클릭 방지) ===================== */
   .ad-spacer{ height: 34px; flex-shrink: 0; }
 </style>
@@ -580,6 +708,23 @@
           <input type="range" class="sound-slider" id="musicVolumeSlider" min="0" max="100" value="40">
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 서율 전체 노선도: 지금까지 복구한 노선들이 쌓여 도시 전체 지하철 지도를 완성해가는 모습을 보여줌 -->
+  <div class="district-toggle-wrap">
+    <button class="district-toggle-btn" id="districtToggleBtn" aria-label="서율 전체 노선도 열기">🗺️</button>
+  </div>
+  <div class="district-overlay hidden" id="districtOverlay">
+    <div class="district-overlay-header">
+      <div>
+        <p class="district-overlay-title">🗺️ 서율 전체 노선도</p>
+        <p class="district-overlay-subtitle">지금까지 복구한 노선이 모여 도시 지하철망을 완성하고 있어요</p>
+      </div>
+      <button class="district-close-btn" id="districtCloseBtn" aria-label="노선도 닫기">✕</button>
+    </div>
+    <div class="district-grid" id="districtGrid">
+      <p class="district-empty-hint" id="districtEmptyHint">아직 복구된 노선이 없어요. 첫 노선을 복구해보세요!</p>
     </div>
   </div>
 
@@ -1262,6 +1407,78 @@ function buildEulerTour(state) {
   return tour;
 }
 
+// ------------------- 서율 전체 노선도 (누적 지도) -------------------
+// 클리어한 노선마다 "풀린 모양"을 하나씩 스냅샷으로 남겨서, 작은 썸네일 갈러리로 쌓아 보여준다.
+// 서로 다른 크기/위치의 노선을 실제 좌표로 이어붙이진 않고(그러려면 레이아웃 솔버가 필요함),
+// 각 노선을 독립된 "구역" 카드로 만들어 나란히 쌓는 모자이크 방식을 쓴다.
+
+// 클리어된 state에서 지도에 필요한 정보만 뽑아낸 순수 데이터 스냅샷을 만든다.
+function snapshotDistrict(state) {
+  return {
+    id: districtLog.length,
+    name: state.name,
+    rows: state.rows,
+    cols: state.cols,
+    cells: state.cells.map(c => ({ r: c.r, c: c.c, baseMask: c.baseMask, role: c.role })),
+  };
+}
+
+// district 썸네일용 타일: 메인 보드와 완전히 동일한 DOM/CSS를 재사용하되, 회전을 걸지 않고
+// baseMask를 그대로 "이미 풀린 모양"으로 보여주고, energized/lit 상태를 강제로 입혀
+// 영구히 빛나는 완성된 구간처럼 보이게 한다. 클릭 리스너는 붙이지 않는다(보기 전용).
+function createDistrictTileElement(cell) {
+  const tile = createTileElement(cell, { interactive: false });
+  tile.classList.add('district-tile', 'energized', 'cleared');
+  if (cell.role === 'station') tile.classList.add('lit');
+  return tile;
+}
+
+function renderDistrictCard(district) {
+  const card = document.createElement('div');
+  card.className = 'district-card';
+
+  const boardMini = document.createElement('div');
+  boardMini.className = 'district-card-board';
+  boardMini.style.gridTemplateColumns = `repeat(${district.cols}, 1fr)`;
+  boardMini.style.gridTemplateRows = `repeat(${district.rows}, 1fr)`;
+
+  const byKey = {};
+  district.cells.forEach(c => { byKey[keyOf(c.r, c.c)] = c; });
+  for (let r = 0; r < district.rows; r++) {
+    for (let c = 0; c < district.cols; c++) {
+      const cell = byKey[keyOf(r, c)];
+      if (cell) {
+        boardMini.appendChild(createDistrictTileElement(cell));
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'cell-empty';
+        boardMini.appendChild(empty);
+      }
+    }
+  }
+
+  const label = document.createElement('p');
+  label.className = 'district-card-label';
+  label.textContent = district.name;
+
+  card.appendChild(boardMini);
+  card.appendChild(label);
+  return card;
+}
+
+// 클리어된 state를 지도에 한 칸 추가 — updateAfterMove()의 클리어 분기에서 호출됨
+function addDistrictToMap(state) {
+  const district = snapshotDistrict(state);
+  districtLog.push(district);
+
+  districtEmptyHintEl.classList.add('hidden');
+  const card = renderDistrictCard(district);
+  card.classList.add('district-card-new');
+  districtGridEl.appendChild(card);
+  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  setTimeout(() => card.classList.remove('district-card-new'), 900);
+}
+
 // ------------------- 화면 렌더링 -------------------
 
 const boardEl = document.getElementById('board');
@@ -1282,6 +1499,15 @@ const musicVolumeSlider = document.getElementById('musicVolumeSlider');
 const modeSelectOverlay = document.getElementById('modeSelectOverlay');
 const mode4Btn = document.getElementById('mode4Btn');
 const mode8Btn = document.getElementById('mode8Btn');
+const districtToggleBtn = document.getElementById('districtToggleBtn');
+const districtOverlay = document.getElementById('districtOverlay');
+const districtCloseBtn = document.getElementById('districtCloseBtn');
+const districtGridEl = document.getElementById('districtGrid');
+const districtEmptyHintEl = document.getElementById('districtEmptyHint');
+
+// districtLog: 지금까지 복구한 노선들의 스냅샷 — "서율 전체 노선도"에 쌓이는 기록.
+// 스테이지를 재시작해도 지워지지 않고, 새로고침할 때만 사라진다(이 게임의 다른 상태와 동일).
+let districtLog = [];
 
 // rotationStep: 클릭 한 번의 회전 단위(45도 칸 수). 4방향 모드=2(90도), 8방향 모드=1(45도).
 // activeStages: 선택한 모드로 플레이할 노선 목록. 4방향 모드는 대각선을 쓰는 노선을 제외한다.
@@ -1509,6 +1735,16 @@ soundToggleBtn.addEventListener('click', () => {
   soundPanel.classList.toggle('hidden');
 });
 
+// 지도 버튼 클릭 -> 서율 전체 노선도 오버레이 펼치기/접기. 사운드 패널이 뒤에 숨은 채
+// 열려있지 않도록 같이 닫아준다.
+districtToggleBtn.addEventListener('click', () => {
+  soundPanel.classList.add('hidden');
+  districtOverlay.classList.toggle('hidden');
+});
+districtCloseBtn.addEventListener('click', () => {
+  districtOverlay.classList.add('hidden');
+});
+
 // 패널 바깥(보드, 버튼 등)을 클릭하면 패널을 자동으로 닫음
 document.addEventListener('pointerdown', (e) => {
   if (!soundPanel.classList.contains('hidden') &&
@@ -1530,7 +1766,10 @@ function unlockAudioOnFirstInteraction() {
 document.addEventListener('pointerdown', unlockAudioOnFirstInteraction, { once: true });
 
 // 타일 DOM 요소를 한 번 생성 (바 + 중심점 + 아이콘)
-function createTileElement(cell) {
+// options.interactive=false면 클릭 리스너를 안 붙임 (서율 전체 노선도의 썸네일처럼
+// 회전/클릭이 필요 없는 "보기 전용" 타일을 만들 때 사용)
+function createTileElement(cell, options = {}) {
+  const interactive = options.interactive !== false;
   const tile = document.createElement('div');
   tile.className = 'tile role-' + cell.role;
 
@@ -1563,7 +1802,7 @@ function createTileElement(cell) {
     tile.appendChild(icon);
   }
 
-  tile.addEventListener('click', () => onTileClick(cell));
+  if (interactive) tile.addEventListener('click', () => onTileClick(cell));
 
   cell._tileEl = tile;
   cell._trackEl = track;
@@ -1712,6 +1951,7 @@ function updateAfterMove() {
     statusEl.textContent = `${currentState.name} 복구 완료!`;
     playClearFanfare();
     playTrainAnimation();
+    addDistrictToMap(currentState); // 방금 복구한 노선을 서율 전체 노선도에 추가
     boardEl.querySelectorAll('.tile').forEach(t => t.classList.add('cleared'));
 
     // 수작업 노선을 처음 다 깨는 순간에만 "모든 노선 복구 완료" 배너를 한 번 보여주고,
