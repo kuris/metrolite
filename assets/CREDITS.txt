@@ -1,0 +1,10 @@
+사운드 출처 (모두 CC0 / 퍼블릭 도메인 — 저작자 표시 의무 없음)
+
+sfx/rotate.ogg          - Kenney "Interface Sounds" (click_001.ogg) - https://kenney.nl/assets/interface-sounds
+sfx/track-connect.ogg   - Kenney "Interface Sounds" (select_001.ogg) - https://kenney.nl/assets/interface-sounds
+sfx/station-connect.ogg - Kenney "Interface Sounds" (confirmation_002.ogg) - https://kenney.nl/assets/interface-sounds
+sfx/clear.ogg           - "Dark Sci-Fi Audio Pack" (victory.ogg) - https://opengameart.org/content/dark-sci-fi-audio-pack
+music/bgm.ogg           - "Dark Sci-Fi Audio Pack" (urgent.ogg) - https://opengameart.org/content/dark-sci-fi-audio-pack
+
+Kenney License: Creative Commons CC0 1.0 Universal (https://creativecommons.org/publicdomain/zero/1.0/)
+Dark Sci-Fi Audio Pack License: CC0 1.0 Universal (as stated on the OpenGameArt page above)

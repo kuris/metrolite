@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>서율 메트로 라이트 - 지하철 전기 복구 퍼즐</title>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3321070604000141"
-     crossorigin="anonymous"></script>
 <style>
   /* ===================== 기본 리셋 ===================== */
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -557,19 +555,8 @@
   .mode-card.easy .mode-card-badge{ background: rgba(99,232,255,0.15); color: var(--cyan); }
   .mode-card.hard .mode-card-badge{ background: rgba(255,224,102,0.15); color: var(--gold); }
 
-  /* ===================== 광고 영역 (Google AdSense 디스플레이 광고) ===================== */
-  .ad-spacer{ height: 34px; flex-shrink: 0; } /* 버튼과 광고 사이 여백 (오클릭 방지) */
-  .ad-banner{
-    flex-shrink: 0;
-    margin: 0 18px 16px;
-    min-height: 56px;
-    border-radius: 14px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255,255,255,0.02);
-  }
+  /* ===================== 하단 여백 (버튼과 화면 끝 사이, 오클릭 방지) ===================== */
+  .ad-spacer{ height: 34px; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -638,17 +625,7 @@
       </div>
     </main>
 
-    <!-- 광고 영역: Google AdSense 디스플레이 광고 (메트로 라이트 하단 배너 슬롯) -->
     <div class="ad-spacer"></div>
-    <div class="ad-banner">
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-3321070604000141"
-           data-ad-slot="3960751645"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-    </div>
 
   </div>
 </div>
@@ -1006,17 +983,7 @@ const TILE_ROTATE_MS = 230;
 let audioCtx = null;
 let sfxBus = null;   // 효과음 전용 마스터 게인
 let musicBus = null; // 배경음악 전용 마스터 게인
-let musicNodes = null;      // 현재 재생 중인 베이스/패드 오실레이터들
-let musicTimer = null;      // 아르페지오 반복 재생용 타이머
-
-// 코드 진행: Am -> F -> C -> G (네온 신스웨이브에 흔히 쓰이는 전개감 있는 진행)
-// bass: 저음 베이스 1개, arp: 아르페지오가 오르내릴 4개 음
-const CHORD_PROGRESSION = [
-  { bass: 55.00, arp: [220.00, 261.63, 329.63, 440.00] }, // Am
-  { bass: 43.65, arp: [174.61, 220.00, 261.63, 349.23] }, // F
-  { bass: 65.41, arp: [261.63, 329.63, 392.00, 523.25] }, // C
-  { bass: 49.00, arp: [196.00, 246.94, 293.66, 392.00] }, // G
-];
+let musicNodes = null;      // 현재 재생 중인 배경음악 버퍼 소스
 
 // 효과음/배경음악 각각의 "슬라이더 볼륨(0~1)"과 "음소거 여부"를 따로 관리
 const sfxState = { volume: 0.7, muted: false };
@@ -1063,282 +1030,96 @@ function refreshMasterIcon() {
   soundToggleBtn.classList.toggle('muted', allMuted);
 }
 
-// 오실레이터 하나로 짧은 톤을 만들어 sfxBus로 재생
-// freq: 주파수(Hz), duration: 길이(초), type: 파형, volume: 0~1, delay: 시작 지연(초)
-function playTone(freq, duration, type, volume, delay) {
+// ------------------- 실제 음원 파일 로딩 (전부 CC0 — 라이선스는 assets/CREDITS.txt 참고) -------------------
+// 합성 대신 짧은 CC0 오디오 파일을 미리 디코딩해두고, 재생할 때는 버퍼를 그대로 튼다.
+// 디코딩은 사용자 제스처 없이도 가능해서 페이지가 열리자마자 미리 불러와 둔다 (첫 클릭 전에 준비 완료).
+const AUDIO_FILES = {
+  rotate: 'assets/sfx/rotate.ogg',
+  trackConnect: 'assets/sfx/track-connect.ogg',
+  stationConnect: 'assets/sfx/station-connect.ogg',
+  clear: 'assets/sfx/clear.ogg',
+  bgm: 'assets/music/bgm.ogg',
+};
+const audioBuffers = {};
+
+function preloadAudio() {
   const ctx = getAudioCtx();
   if (!ctx) return;
-  ensureAudioBuses(ctx);
-  try {
-    const t0 = ctx.currentTime + (delay || 0);
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type || 'sine';
-    osc.frequency.setValueAtTime(freq, t0);
-    gain.gain.setValueAtTime(0, t0);
-    gain.gain.linearRampToValueAtTime(volume != null ? volume : 0.2, t0 + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-    osc.connect(gain);
-    gain.connect(sfxBus);
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.02);
-  } catch (e) {
-    // 오디오 재생에 실패해도 게임 진행에는 영향 없음
-  }
-}
-
-// 타일을 회전할 때 나는 짧고 또렷한 클릭음 ("상쾌함"을 위해 깔끔하고 짧게)
-function playRotateSound() {
-  playTone(620, 0.045, 'triangle', 0.09, 0);
-}
-
-// 선로가 "딱" 맞물려 전기가 들어오는 순간 재생되는 사운드.
-// "타격감 + 신비함"을 동시에 내기 위해:
-// 1) 벨 배음으로 또렷하게 "팅!" 하고 때리고,
-// 2) 그 뒤로 2번의 echo(지연된 반복음)를 점점 작게 붙여 터널 속에서 울리는 듯한 신비로운 잔향을 만들고,
-// 3) 낮은 주파수에서 확 솟았다가 뚝 떨어지는 사인파 스윕으로 "쫙 뚫고 지나가는" 질주감을 더한다.
-// order: 같은 턴에 여러 역이 동시에 켜질 경우 순서대로 음을 살짝 높여 화음처럼 들리게 함
-function playConnectSound(order) {
-  const n = order || 0;
-  const baseFreq = 740 * Math.pow(1.1, n);
-  const t = n * 0.08;
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  ensureAudioBuses(ctx);
-
-  // 벨 배음 + 터널 echo: 원음과 똑같은 배음 구성을 지연시켜 점점 작게 반복 -> 신비로운 잔향
-  const partials = [ // [배수비, 상대 볼륨, 길이(초)]
-    [1.0, 0.34, 0.4],
-    [2.0, 0.15, 0.3],
-    [3.0, 0.07, 0.22],
-  ];
-  const echoes = [ // [추가 지연(초), 볼륨 배수]
-    [0, 1],
-    [0.1, 0.4],
-    [0.2, 0.16],
-  ];
-  echoes.forEach(([echoDelay, echoVol]) => {
-    partials.forEach(([ratio, vol, dur]) => {
-      try {
-        const t0 = ctx.currentTime + t + echoDelay;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(baseFreq * ratio, t0);
-        gain.gain.setValueAtTime(0, t0);
-        gain.gain.linearRampToValueAtTime(vol * echoVol, t0 + 0.005); // 아주 짧은 어택 -> "딱" 끊어지는 타격감
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-        osc.connect(gain);
-        gain.connect(sfxBus);
-        osc.start(t0);
-        osc.stop(t0 + dur + 0.02);
-      } catch (e) {
-        // 오디오 재생 실패해도 게임 진행에는 영향 없음
-      }
-    });
+  Object.entries(AUDIO_FILES).forEach(([key, url]) => {
+    fetch(url)
+      .then(res => res.arrayBuffer())
+      .then(data => ctx.decodeAudioData(data))
+      .then(decoded => { audioBuffers[key] = decoded; })
+      .catch(() => {
+        // 파일을 못 불러와도(네트워크 실패 등) 게임 진행에는 영향 없음 - 해당 사운드만 조용히 재생 안 됨
+      });
   });
+}
 
-  // 전류 스윕: 낮은 주파수에서 순식간에 솟구쳤다가 길게 떨어지는 사인파 -> 거친 "지지직" 느낌 없이
-  // 깨끗하고 상쾌하게 "쫙 뚫고 지나가는" 질주감만 남긴다
+// 로딩된 버퍼 하나를 지정된 버스로 재생. volume: 0~1, playbackRate: 피치(1=원본), delay: 시작 지연(초)
+function playBuffer(bus, buffer, { volume, playbackRate, delay } = {}) {
+  const ctx = getAudioCtx();
+  if (!ctx || !buffer) return; // 아직 로딩 중이면 조용히 무시 (게임 진행에는 영향 없음)
+  ensureAudioBuses(ctx);
   try {
-    const t0 = ctx.currentTime + t;
-    const sweep = ctx.createOscillator();
-    const sweepGain = ctx.createGain();
-    sweep.type = 'sine';
-    sweep.frequency.setValueAtTime(180, t0);
-    sweep.frequency.exponentialRampToValueAtTime(1400, t0 + 0.05); // 업: 순식간에 솟구침
-    sweep.frequency.exponentialRampToValueAtTime(70, t0 + 0.26);  // 다운: 길게 떨어지며 사그라듦
-    sweepGain.gain.setValueAtTime(0.0001, t0);
-    sweepGain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.045);
-    sweepGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
-    sweep.connect(sweepGain);
-    sweepGain.connect(sfxBus);
-    sweep.start(t0);
-    sweep.stop(t0 + 0.32);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    if (playbackRate != null) src.playbackRate.value = playbackRate;
+    const gain = ctx.createGain();
+    gain.gain.value = volume != null ? volume : 1;
+    src.connect(gain);
+    gain.connect(bus);
+    src.start(ctx.currentTime + (delay || 0));
+    return src;
   } catch (e) {
     // 오디오 재생 실패해도 게임 진행에는 영향 없음
   }
 }
 
-// 스테이지를 모두 복구했을 때 재생되는 사운드: 치고 올라가는 아르페지오 + 마지막에 터지는
-// 묵직한 임팩트 한 번으로 "쾌감"을 주고, 그 위에 echo가 살짝 걸린 샤인 테일로 신비로움을 남긴다.
+// 타일을 회전할 때 나는 짧고 또렷한 클릭음
+function playRotateSound() {
+  playBuffer(sfxBus, audioBuffers.rotate, { volume: 0.9 });
+}
+
+// 선로 조각 하나가 막 연결되는 순간의 가벼운 틱 - 역이 켜질 때보다 짧고 가볍게,
+// 선로가 하나하나 이어질 때마다 또렷한 타격감만 남긴다
+// order: 같은 턴에 여러 선로가 동시에 연결되면 순서대로 피치를 살짝 높여 또르르 이어지는 느낌을 줌
+function playTrackConnectSound(order) {
+  const n = order || 0;
+  playBuffer(sfxBus, audioBuffers.trackConnect, { volume: 0.9, playbackRate: Math.pow(1.05, n), delay: n * 0.02 });
+}
+
+// 선로가 "딱" 맞물려 역에 전기가 들어오는 순간 재생되는, 더 또렷하고 풍성한 확인음
+// order: 같은 턴에 여러 역이 동시에 켜질 경우 순서대로 피치를 살짝 높여 화음처럼 들리게 함
+function playConnectSound(order) {
+  const n = order || 0;
+  playBuffer(sfxBus, audioBuffers.stationConnect, { volume: 1, playbackRate: Math.pow(1.05, n), delay: n * 0.05 });
+}
+
+// 스테이지를 모두 복구했을 때 재생되는 승리 사운드
 function playClearFanfare() {
-  const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
-  notes.forEach((freq, i) => playTone(freq, 0.3, 'triangle', 0.24, i * 0.07));
-  notes.forEach((freq, i) => playTone(freq * 2, 0.16, 'square', 0.08, i * 0.07 + 0.02));
-  // 마무리 임팩트: 아르페지오가 끝나는 타이밍에 묵직한 저음 한 방 + echo 2번으로 여운을 남김
-  const impactAt = notes.length * 0.07 + 0.05;
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  ensureAudioBuses(ctx);
-  [[0, 1], [0.14, 0.45], [0.28, 0.2]].forEach(([echoDelay, echoVol]) => {
-    try {
-      const t0 = ctx.currentTime + impactAt + echoDelay;
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(130, t0);
-      osc.frequency.exponentialRampToValueAtTime(55, t0 + 0.3);
-      g.gain.setValueAtTime(0.26 * echoVol, t0);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
-      osc.connect(g);
-      g.connect(sfxBus);
-      osc.start(t0);
-      osc.stop(t0 + 0.55);
-    } catch (e) {
-      // 오디오 재생 실패해도 게임 진행에는 영향 없음
-    }
-  });
+  playBuffer(sfxBus, audioBuffers.clear, { volume: 1 });
 }
 
-// ------------------- 배경음악 ("신비한 터널을 질주하는 하이퍼 기차" 컨셉) -------------------
-//
-// EDM 팝 스타일의 킥+하이햇+사이드체인 펌핑 대신, 레일 위를 달리는 금속성 "다그닥다그닥" 리듬과
-// 공용 레조넌트 필터를 통과한 또렷한 리드 톤, 그 아래 둥글게 깎인 저음 드론으로
-// "질주감은 있지만 통통 튀는 EDM 팝은 아닌" 분위기를 만든다.
-const BEAT_MS = 240; // 한 스텝의 길이(ms) - 질주감은 유지하되 기존 EDM 팝(190ms)보다 약간 느긋하게
-
-// 레일 클랙 등 타격감 있는 퍼커션에 쓸 노이즈 버퍼 (최초 1회만 만들어 재사용)
-let noiseBuffer = null;
-function getNoiseBuffer(ctx) {
-  if (!noiseBuffer) {
-    const size = ctx.sampleRate * 0.2;
-    noiseBuffer = ctx.createBuffer(1, size, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
-  }
-  return noiseBuffer;
-}
-
-// 기차 레일이 맞물리는 금속성 "클랙" - 매 스텝마다 울려 꾸준한 질주감을 유지한다
-function scheduleRailClack(ctx, t0, accent) {
-  const src = ctx.createBufferSource();
-  src.buffer = getNoiseBuffer(ctx);
-  const bp = ctx.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = accent ? 1900 : 1400;
-  bp.Q.value = 3.4; // 금속성 "쨍" 느낌을 위해 Q를 높게
-  const g = ctx.createGain();
-  const vol = accent ? 0.08 : 0.045;
-  g.gain.setValueAtTime(vol, t0);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
-  src.connect(bp);
-  bp.connect(g);
-  g.connect(musicBus);
-  src.start(t0);
-  src.stop(t0 + 0.06);
-}
-
-// 박의 첫머리(다운비트)에만 울리는 묵직한 저음 스러스트 - 기차 엔진이 앞으로 미는 힘
-function scheduleThrust(ctx, t0) {
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(72, t0);
-  osc.frequency.exponentialRampToValueAtTime(40, t0 + 0.24);
-  g.gain.setValueAtTime(0.2, t0);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
-  osc.connect(g);
-  g.connect(musicBus);
-  osc.start(t0);
-  osc.stop(t0 + 0.32);
-}
-
+// ------------------- 배경음악 -------------------
+// "신비한 터널을 질주하는 하이퍼 기차" 느낌의 CC0 루프 파일을 그대로 반복 재생한다.
 function startBackgroundMusic() {
   const ctx = getAudioCtx();
   if (!ctx || musicNodes) return; // 오디오 미지원 또는 이미 재생 중이면 무시
+  const buffer = audioBuffers.bgm;
+  if (!buffer) return; // 아직 로딩 중이면 무시 (볼륨 조절 등으로 다시 호출되면 그때 재생됨)
   ensureAudioBuses(ctx);
-
-  // 1) 저음 드론: 코드를 따라 음높이가 미끄러지듯 바뀌며, 로우패스 필터로 둥글게 깎아
-  //    "터널 저편에서 울리는" 신비로운 저음을 만든다 (EDM식 사이드체인 펌핑은 넣지 않음)
-  const bassOsc = ctx.createOscillator();
-  const bassFilter = ctx.createBiquadFilter();
-  const bassGain = ctx.createGain();
-  bassOsc.type = 'sawtooth';
-  bassOsc.frequency.value = CHORD_PROGRESSION[0].bass;
-  bassFilter.type = 'lowpass';
-  bassFilter.frequency.value = 320;
-  bassFilter.Q.value = 0.7;
-  bassGain.gain.value = 0.09;
-  bassOsc.connect(bassFilter);
-  bassFilter.connect(bassGain);
-  bassGain.connect(musicBus);
-  bassOsc.start();
-
-  // 2) 리드가 함께 통과하는 공용 레조넌트 필터: 아주 느린 LFO로 컷오프를 흔들어
-  //    "전류가 지나가며 울렁이는" 신비로운 움직임을 더함
-  const leadFilter = ctx.createBiquadFilter();
-  leadFilter.type = 'lowpass';
-  leadFilter.frequency.value = 1600;
-  leadFilter.Q.value = 4;
-  leadFilter.connect(musicBus);
-  const lfo = ctx.createOscillator();
-  const lfoGain = ctx.createGain();
-  lfo.frequency.value = 0.12;
-  lfoGain.gain.value = 500;
-  lfo.connect(lfoGain);
-  lfoGain.connect(leadFilter.frequency);
-  lfo.start();
-
-  musicNodes = { bassOsc, bassFilter, bassGain, leadFilter, lfo };
-
-  let chordIndex = 0;
-  let arpStep = 0;
-  const STEPS_PER_CHORD = 8; // 코드 블록 하나당 스텝 수
-  // 8스텝 동안 오르내리는 중간에 한 번 더 튀어 오르는 패턴 -> 단조롭지 않게 움직임
-  const pattern = [0, 1, 2, 3, 2, 3, 1, 0];
-
-  // 3) 매 스텝마다 리드(아르페지오) + 레일 클랙을 쏟아내고, 박의 첫머리에만 저음 스러스트를 더해
-  //    "쉼 없이 질주하지만 EDM 팝처럼 통통 튀지는 않는" 루프를 만든다
-  function playStep() {
-    if (!musicNodes) return; // 음악이 멈췄으면 더 이상 예약하지 않음
-    const ctx2 = getAudioCtx();
-    const chord = CHORD_PROGRESSION[chordIndex];
-    const t0 = ctx2.currentTime;
-
-    // 각 코드 블록의 첫 스텝에서 베이스를 그 코드 음으로 부드럽게 이동(글라이드)
-    if (arpStep === 0) {
-      musicNodes.bassOsc.frequency.cancelScheduledValues(t0);
-      musicNodes.bassOsc.frequency.setTargetAtTime(chord.bass, t0, 0.15);
-    }
-
-    const noteIdx = pattern[arpStep % pattern.length];
-    const freq = chord.arp[noteIdx];
-    const dur = (BEAT_MS / 1000) * 0.85;
-
-    // 리드 톤: 톱니 하나를 공용 레조넌트 필터에 통과시켜 "전류가 흐르는" 듯한 또렷한 음색을 만듦
-    const osc = ctx2.createOscillator();
-    const g = ctx2.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(0.07, t0 + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g);
-    g.connect(musicNodes.leadFilter);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
-
-    // 매 스텝 레일 클랙으로 꾸준한 질주감을 유지하고, 박의 첫머리(4스텝마다)는 저음 스러스트로 힘을 더함
-    const isDownbeat = arpStep % 4 === 0;
-    scheduleRailClack(ctx2, t0, isDownbeat);
-    if (isDownbeat) scheduleThrust(ctx2, t0);
-
-    arpStep++;
-    if (arpStep >= STEPS_PER_CHORD) { // 한 코드 블록 끝나면 다음 코드로 진행
-      arpStep = 0;
-      chordIndex = (chordIndex + 1) % CHORD_PROGRESSION.length;
-    }
-    musicTimer = setTimeout(playStep, BEAT_MS);
-  }
-  playStep();
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  src.connect(musicBus);
+  src.start();
+  musicNodes = { src };
 }
 
 function stopBackgroundMusic() {
-  if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
   if (musicNodes) {
-    try { musicNodes.bassOsc.stop(); } catch (e) {}
-    try { musicNodes.lfo.stop(); } catch (e) {}
+    try { musicNodes.src.stop(); } catch (e) {}
     musicNodes = null;
   }
 }
@@ -1509,12 +1290,14 @@ function playConnectVisualEffect(cell) {
 }
 
 // 타일들의 시각 상태(회전/통전 색상)를 갱신하고 통전 역 개수를 반환
-// newlyLit: 이번 클릭으로 "방금 막" 켜진 역 목록 (연결 사운드 재생에 사용)
-// silent: true면 이펙트/사운드 트리거용 newlyLit을 계산하지 않고 상태만 조용히 맞춰둠
+// newlyEnergized: 이번 클릭으로 "방금 막" 통전된 선로/역 전체 목록 (타일 하나하나 연결될 때마다 나는 사운드에 사용)
+// newlyLit: 그중 "역"만 모은 목록 (별도의 더 풍성한 완성 사운드 + 팝 애니메이션에 사용)
+// silent: true면 이펙트/사운드 트리거용 목록을 계산하지 않고 상태만 조용히 맞춰둠
 //         (스테이지를 처음 불러올 때, 우연히 이미 연결된 타일에서 이펙트가 터지는 것을 방지)
 function refreshVisuals(state, silent) {
   computeEnergized(state);
   let lit = 0, total = 0;
+  const newlyEnergized = [];
   const newlyLit = [];
 
   state.cells.forEach(cell => {
@@ -1522,9 +1305,10 @@ function refreshVisuals(state, silent) {
     const wasEnergized = cell._wasEnergized;
     cell._tileEl.classList.toggle('energized', cell.energized);
 
-    // 선로/일반역이 "방금 처음 통전된 순간"이면 스파크 이펙트를 터뜨림 (초기 로드 시에는 조용히 넘어감)
+    // 선로/일반역이 "방금 처음 통전된 순간"이면 스파크 이펙트를 터뜨리고 사운드 대상에 추가
     if (!silent && cell.energized && !wasEnergized && cell.role !== 'power') {
       playConnectVisualEffect(cell);
+      newlyEnergized.push(cell);
     }
     cell._wasEnergized = cell.energized;
 
@@ -1534,7 +1318,7 @@ function refreshVisuals(state, silent) {
       const wasLit = cell._wasLit;
       cell._tileEl.classList.toggle('lit', cell.energized);
       if (!silent && cell.energized && !wasLit) {
-        // 방금 막 불이 켜진 순간 -> 반짝 애니메이션 + 사운드 대상에 추가
+        // 방금 막 불이 켜진 순간 -> 반짝 애니메이션 + 더 풍성한 완성 사운드 대상에 추가
         cell._tileEl.classList.add('pop');
         setTimeout(() => cell._tileEl.classList.remove('pop'), 500);
         newlyLit.push(cell);
@@ -1543,7 +1327,7 @@ function refreshVisuals(state, silent) {
     }
   });
 
-  return { lit, total, newlyLit };
+  return { lit, total, newlyEnergized, newlyLit };
 }
 
 let pendingSettleTimer = null; // "회전이 막 끝나는 순간" 통전 판정을 예약해두는 전역 타이머
@@ -1565,7 +1349,12 @@ function onTileClick(cell) {
 
 // 회전 후 상태 메시지/클리어 여부 갱신
 function updateAfterMove() {
-  const { lit, total, newlyLit } = refreshVisuals(currentState);
+  const { lit, total, newlyEnergized, newlyLit } = refreshVisuals(currentState);
+
+  // 선로 조각이 하나하나 연결될 때마다(역은 아래에서 별도로 처리) 가벼운 스파크 틱을 순서대로 재생
+  const newlyLitSet = new Set(newlyLit);
+  const newlyTracks = newlyEnergized.filter(cell => !newlyLitSet.has(cell));
+  newlyTracks.forEach((cell, i) => playTrackConnectSound(i));
 
   // 방금 새로 연결된 역이 있으면 역마다 "핑" 전기음을 순서대로 재생
   newlyLit.forEach((cell, i) => playConnectSound(i));
@@ -1704,6 +1493,7 @@ mode8Btn.addEventListener('click', () => startWithMode(1));
 
 // ------------------- 게임 시작 -------------------
 refreshMasterIcon();
+preloadAudio(); // 첫 클릭 전에 미리 디코딩해둬서, 실제로 소리가 필요한 시점엔 바로 재생되게 함
 </script>
 </body>
 </html>
